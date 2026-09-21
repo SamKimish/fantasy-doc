@@ -11,6 +11,7 @@
     --room: #e7f3f2; --tile: #d3e6e4; --card: #ffffff; --sheet: #eaf5f8; --sheet-line: #cfe4ea;
     --text: #12262a; --muted: #5b7378; --border: #cfe0e0; --shadow: 0 6px 18px rgba(14, 90, 90, .12);
     --teal: #0e7c7b; --teal-dark: #0a5c5b; --frame: #93a9ad;
+    --board: #b08b5e; --board-dark: #8a6a43; --paper: #fffef8; --paper-rule: #e3c9c9;
     --out: #d7263d; --ir: #7a3fd1; --doubtful: #dd5a0a; --questionable: #b98300;
     --qb: #d93f4f; --rb: #17915f; --wr: #2b73d6; --te: #c2650a; --k: #7c4ddb; --def: #6b5d52; --other: #5f6f74;
   }
@@ -19,6 +20,7 @@
       --room: #0c1a1c; --tile: #12282a; --card: #152426; --sheet: #1b3236; --sheet-line: #274449;
       --text: #e6f1f1; --muted: #93aeb1; --border: #26403f; --shadow: 0 6px 18px rgba(0, 0, 0, .4);
       --teal: #2bb5b3; --teal-dark: #1e8f8d; --frame: #5c7a7e;
+      --board: #6b533a; --board-dark: #4d3b2a; --paper: #1b2c2f; --paper-rule: #3a2f34;
       --out: #ff5a6e; --ir: #a985ff; --doubtful: #ff8a3d; --questionable: #f0b429;
     }
   }
@@ -96,60 +98,76 @@
   .pill.status { background: var(--st); }
   .pill.status.tally-pill { padding: 3px 11px; font-size: .8rem; }
 
-  /* ---------- treatment bed ---------- */
-  .bed { margin: 22px 0 34px; position: relative; }
+  /* ---------- patient clipboard ---------- */
+  .bed {
+    position: relative; margin: 26px 0 30px; padding: 14px 12px 14px; background: var(--board);
+    border-radius: 14px; border-bottom: 5px solid var(--board-dark); box-shadow: var(--shadow);
+  }
+  .bed::before { /* metal clip */
+    content: ""; position: absolute; z-index: 2; top: -12px; left: 50%; width: 104px; height: 34px; margin-left: -52px;
+    background: linear-gradient(#e6eaec, #9aa5aa 70%, #7f8b90); border-radius: 9px 9px 5px 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .3);
+  }
+  .bed::after { /* clip slot */
+    content: ""; position: absolute; z-index: 3; top: 2px; left: 50%; width: 48px; height: 7px; margin-left: -24px;
+    background: #55605f; border-radius: 4px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .5);
+  }
+  .paper {
+    position: relative; padding: 30px 16px 14px; background: var(--paper); border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25); border-left: 4px double var(--paper-rule);
+  }
+  .chart-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--text); margin-bottom: 12px;
+  }
+  .chart-title { font-weight: 800; font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; }
+  .chart-id { font: 600 .72rem ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
+
+  .patient { display: flex; gap: 12px; align-items: flex-start; }
+  .photo { /* ID photo, taped on */
+    position: relative; flex: none; padding: 4px 4px 12px; background: #fff; border: 1px solid var(--paper-rule);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transform: rotate(-2deg);
+  }
+  .photo::before { /* tape */
+    content: ""; position: absolute; top: -7px; left: 50%; width: 30px; height: 12px; margin-left: -15px;
+    background: rgba(255, 224, 130, .75); transform: rotate(3deg);
+  }
+  .avatar { display: block; width: 72px; height: 72px; object-fit: cover; object-position: center top; background: var(--room); }
+  .avatar.fallback { display: grid; place-items: center; font-weight: 800; font-size: 1.4rem; color: var(--muted); }
+  .who { min-width: 0; flex: 1; }
+  .name { font-size: 1.2rem; font-weight: 800; line-height: 1.15; margin: 0 0 6px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .vitals { color: var(--muted); font-size: .82rem; margin-top: 6px; }
+  .stamp { /* rubber stamp */
+    flex: none; transform: rotate(4deg); padding: 3px 9px; color: var(--st);
+    border: 3px double var(--st); border-radius: 6px; font-weight: 900; font-size: .85rem;
+    letter-spacing: .12em; text-transform: uppercase; opacity: .9;
+  }
+
   .monitor {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    margin: 0 18px; padding: 8px 12px; background: #0b1f22; border-radius: 12px 12px 0 0;
-    border: 2px solid var(--frame); border-bottom: 0;
+    margin: 14px 0; padding: 6px 12px; background: #0b1f22; border-radius: 8px; border: 2px solid var(--frame);
   }
   .monitor svg { width: 120px; height: 28px; flex: none; }
   .ecg { fill: none; stroke: var(--st); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .bpm { color: var(--st); font: 700 .75rem ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; }
-  .mattress {
-    position: relative; background: var(--card); border: 2px solid var(--frame); border-radius: 16px 16px 10px 10px;
-    padding: 16px 16px 14px; box-shadow: var(--shadow);
-  }
-  .mattress::before { /* sheet strip along the top */
-    content: ""; position: absolute; inset: 0 0 auto 0; height: 7px; background: var(--st); opacity: .85;
-    border-radius: 14px 14px 0 0;
-  }
-  .mattress > * { position: relative; }
-  .patient { display: flex; gap: 14px; align-items: center; margin-top: 4px; }
-  .pillow {
-    flex: none; width: 92px; padding: 8px; border-radius: 26px; background: var(--sheet);
-    border: 1px solid var(--sheet-line); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .05);
-  }
-  .avatar {
-    display: block; width: 76px; height: 76px; border-radius: 50%; object-fit: cover; object-position: center top;
-    background: var(--room); border: 3px solid var(--st);
-  }
-  .avatar.fallback { display: grid; place-items: center; font-weight: 800; font-size: 1.4rem; color: var(--muted); }
-  .who { min-width: 0; flex: 1; }
-  .name { font-size: 1.15rem; font-weight: 750; line-height: 1.2; margin: 0 0 6px; }
-  .tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .vitals { color: var(--muted); font-size: .85rem; margin-top: 6px; }
-  .wristband { flex: none; align-self: flex-start; }
 
-  .chart { margin-top: 14px; padding: 10px 12px; background: var(--sheet); border: 1px dashed var(--sheet-line); border-radius: 10px; }
-  .chart dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: .92rem; }
-  .chart dt { color: var(--muted); font-weight: 600; }
-  .chart dd { margin: 0; }
-  .leagues { margin: 12px 0 0; padding: 0; list-style: none; }
-  .leagues h3 { margin: 0 0 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  .leagues li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: .95rem; }
-  .leagues li:first-of-type { border-top: 0; }
+  .fields { display: grid; gap: 8px; }
+  .field { display: flex; align-items: baseline; gap: 10px; border-bottom: 1px dotted var(--muted); padding-bottom: 3px; }
+  .flabel { flex: none; width: 58px; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .fvalue { flex: 1; min-width: 0; font-size: .95rem; font-weight: 600; }
+
+  .leagues { margin: 14px 0 0; padding: 0; list-style: none; }
+  .leagues h3 { margin: 0 0 4px; font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  .leagues li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: .95rem; }
+  .check { /* ticked box */
+    flex: none; width: 18px; height: 18px; display: grid; place-items: center; border: 2px solid var(--text);
+    border-radius: 3px; font-size: .8rem; font-weight: 900; line-height: 1; color: var(--st);
+  }
   .leagues img { width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--room); }
   .leagues .lname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  /* bed rails + wheels */
-  .rail { position: relative; height: 12px; margin: 0 10px; background: var(--frame); border-radius: 0 0 8px 8px; }
-  .rail::before, .rail::after {
-    content: ""; position: absolute; top: 12px; width: 4px; height: 14px; background: var(--frame);
-  }
-  .rail::before { left: 22px; } .rail::after { right: 22px; }
-  .wheel { position: absolute; bottom: -28px; width: 16px; height: 16px; border-radius: 50%; background: #2a3a3d; border: 3px solid var(--frame); }
-  .wheel.l { left: 16px; } .wheel.r { right: 16px; }
+  .sign { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--paper-rule); font-size: .7rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .sign em { font: italic 1.05rem Georgia, "Times New Roman", serif; color: var(--text); text-transform: none; letter-spacing: 0; margin-left: 6px; }
 
   .clear { text-align: center; padding: 26px 16px; margin-top: 18px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
   .clear .big { font-size: 1.25rem; font-weight: 800; color: var(--rb); margin-bottom: 4px; }
@@ -161,7 +179,7 @@
   @keyframes sweep { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
   .ecg.live { stroke-dasharray: 260; animation: sweep 2.4s linear infinite; }
   @media (prefers-reduced-motion: reduce) { .ecg.live { animation: none; stroke-dasharray: none; } }
-  @media (max-width: 380px) { .pillow { width: 78px; } .avatar { width: 62px; height: 62px; } }
+  @media (max-width: 380px) { .avatar { width: 58px; height: 58px; } .stamp { font-size: .75rem; } }
 </style>
 </head>
 <body>
@@ -352,58 +370,63 @@ function shortDate(iso) {
   return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function field(label, value) {
+  const f = el("div", "field");
+  f.append(el("span", "flabel", label), el("span", "fvalue", value));
+  return f;
+}
+
 function bed(pid, p, entries) {
   const sev = SEVERITY[p.st];
   const flat = sev <= 1; // Out / IR: flatline
-  const wrap = el("article", "bed " + ST_CLASS[sev]);
+  const board = el("article", "bed " + ST_CLASS[sev]);
+  const paper = el("div", "paper");
 
-  const mon = el("div", "monitor");
-  mon.append(ecg(flat, true), el("span", "bpm", flat ? "— — BPM" : sev === 2 ? "58 BPM" : "72 BPM"));
+  const head = el("div", "chart-head");
+  const titles = el("div");
+  titles.append(el("div", "chart-title", "\u271A Patient chart"), el("div", "chart-id", "No. " + pid));
+  head.append(titles, el("div", "stamp", LABEL[p.st] || p.st));
 
-  const mat = el("div", "mattress");
   const patient = el("div", "patient");
-  const pillow = el("div", "pillow");
-  pillow.append(avatar(pid, p.n));
+  const photo = el("div", "photo");
+  photo.append(avatar(pid, p.n));
   const who = el("div", "who");
   const tags = el("div", "tags");
   tags.append(posPill(p.pos), teamPill(p.team));
   if (p.no) tags.append(el("span", "pill slot", "#" + p.no));
-  const vitals = [p.age && `${p.age} yrs`, p.ht && height(p.ht), p.wt && `${p.wt} lbs`].filter(Boolean).join(" · ");
+  const vitals = [p.age && `${p.age} yrs`, p.ht && height(p.ht), p.wt && `${p.wt} lbs`].filter(Boolean).join(" \u00B7 ");
   who.append(el("h2", "name", p.n), tags);
   if (vitals) who.append(el("div", "vitals", vitals));
-  const band = statusPill(p.st);
-  band.classList.add("wristband");
-  patient.append(pillow, who, band);
+  patient.append(photo, who);
 
-  const chart = el("div", "chart");
-  const dl = el("dl");
-  const rows = [
-    ["Injury", p.body || "Not specified"],
-    p.notes && ["Notes", p.notes],
-    p.since && shortDate(p.since) && ["Since", shortDate(p.since)],
-  ].filter(Boolean);
-  for (const [k, v] of rows) dl.append(el("dt", null, k), el("dd", null, v));
-  chart.append(dl);
+  const mon = el("div", "monitor");
+  mon.append(ecg(flat, true), el("span", "bpm", flat ? "\u2014 \u2014 BPM" : sev === 2 ? "58 BPM" : "72 BPM"));
+
+  const fields = el("div", "fields");
+  fields.append(field("Injury", p.body || "Not specified"));
+  if (p.notes) fields.append(field("Notes", p.notes));
+  if (p.since && shortDate(p.since)) fields.append(field("Since", shortDate(p.since)));
 
   const ul = el("ul", "leagues");
   ul.append(el("h3", null, `Starting in ${entries.length} league${entries.length > 1 ? "s" : ""}`));
   for (const { league, slot } of entries) {
     const li = el("li");
+    li.append(el("span", "check", "\u2713"));
     const img = el("img"); img.alt = ""; img.loading = "lazy";
     if (league.avatar) img.src = `${CDN}/avatars/thumb/${league.avatar}`;
     else img.style.visibility = "hidden";
     img.onerror = () => { img.style.visibility = "hidden"; };
-    li.append(img);
-    li.append(el("span", "lname", league.name));
+    li.append(img, el("span", "lname", league.name));
     if (slot) li.append(el("span", "pill slot", slot.replace("SUPER_FLEX", "SFLX").replace("FLEX", "FLX")));
     ul.append(li);
   }
 
-  mat.append(patient, chart, ul);
-  const rail = el("div", "rail");
-  const l = el("span", "wheel l"), r = el("span", "wheel r");
-  wrap.append(mon, mat, rail, l, r);
-  return wrap;
+  const sign = el("div", "sign", "Attending physician:");
+  sign.append(el("em", null, "Dr. Fantasy"));
+
+  paper.append(head, patient, mon, fields, ul, sign);
+  board.append(paper);
+  return board;
 }
 
 function render(list, leagueCount) {
