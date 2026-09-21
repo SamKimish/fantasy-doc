@@ -89,6 +89,19 @@
   .toggle input:checked + .switch::after { transform: translateX(18px); }
   .toggle input:focus-visible + .switch { outline: 3px solid var(--teal); outline-offset: 2px; }
 
+  .sort { margin: 14px 0 0; padding: 12px 0 0; border: 0; border-top: 1px dashed var(--border); }
+  .sort legend { float: left; margin: 0 10px 0 0; padding: 0; line-height: 34px; font-size: .92rem; }
+  .seg { display: flex; background: var(--room); border: 1px solid var(--border); border-radius: 10px; padding: 2px; }
+  .seg label { flex: 1; cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .seg span {
+    display: block; padding: 6px 8px; text-align: center; font-size: .82rem; font-weight: 700;
+    color: var(--muted); border-radius: 8px;
+  }
+  .seg input:checked + span { background: var(--teal); color: #fff; }
+  .seg input:focus-visible + span { outline: 3px solid var(--teal); outline-offset: 1px; }
+  .rec { flex: none; font: 700 .78rem ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
+
   /* ---------- toolbar (refresh / copy link) ---------- */
   .bar { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
   .bar[hidden] { display: none; }
@@ -310,6 +323,13 @@
       <label class="toggle"><input type="checkbox" id="hideStarted" checked><span class="switch" aria-hidden="true"></span><span>Hide games that have started</span></label>
       <label class="toggle"><input type="checkbox" id="onlyOut"><span class="switch" aria-hidden="true"></span><span>Only show OUT players</span></label>
       <label class="toggle"><input type="checkbox" id="byLeague"><span class="switch" aria-hidden="true"></span><span>Group by league</span></label>
+      <fieldset class="sort">
+        <legend>Sort by</legend>
+        <div class="seg">
+          <label><input type="radio" name="sort" value="severity" checked><span>Injury severity</span></label>
+          <label><input type="radio" name="sort" value="record"><span>League record</span></label>
+        </div>
+      </fieldset>
     </div>
   </form>
 
@@ -363,6 +383,8 @@ hideBox.checked = load("fd_hide_started") !== "0";
 onlyOutBox.checked = load("fd_only_out") === "1";
 byLeagueBox.checked = load("fd_by_league") === "1";
 let soundOn = load("fd_sound") === "1";
+let sortMode = load("fd_sort") === "record" ? "record" : "severity"; // default: injury severity
+document.querySelector(`input[name=sort][value=${sortMode}]`).checked = true;
 
 async function getJSON(path) {
   const res = await fetch(API + path);
@@ -440,6 +462,24 @@ function ecg(kind, live) {
   path.setAttribute("class", "ecg" + (live && kind !== "flat" ? " live" : ""));
   svg.append(path);
   return svg;
+}
+
+// ---------- league record ----------
+function recordOf(roster) {
+  const s = (roster && roster.settings) || {};
+  const w = s.wins || 0, l = s.losses || 0, t = s.ties || 0, n = w + l + t;
+  return { label: `${w}-${l}${t ? "-" + t : ""}`, pct: n ? (w + t / 2) / n : null };
+}
+
+// Importance by record: a player counts by the best record among the leagues they start in.
+// Leagues with no games played yet count as .500, so early in the season it falls back to severity.
+const bestPct = (entries) => Math.max(...entries.map((e) => (e.rec.pct ?? 0.5)));
+
+function comparePatients(a, b) {
+  const bySeverity = SEVERITY[a.p.st] - SEVERITY[b.p.st];
+  const byLeagues = b.entries.length - a.entries.length;
+  if (sortMode === "record") return bestPct(b.entries) - bestPct(a.entries) || bySeverity || byLeagues;
+  return bySeverity || byLeagues;
 }
 
 // ---------- games ----------
@@ -523,11 +563,12 @@ async function run(username, { quiet = false } = {}) {
     info.set(league.league_id, { rostered, mine });
     if (!mine) return;
     const slots = (league.roster_positions || []).filter((s) => s !== "BN");
+    const rec = recordOf(mine);
     (mine.starters || []).forEach((pid, idx) => {
       const p = players[pid];
       if (!p || !(p.st in SEVERITY)) return;
       if (!flagged.has(pid)) flagged.set(pid, { pid, p, entries: [] });
-      flagged.get(pid).entries.push({ league, slot: slots[idx] || "" });
+      flagged.get(pid).entries.push({ league, slot: slots[idx] || "", rec });
     });
   });
 
@@ -606,7 +647,7 @@ function field(label, value) {
 const DOCTORS = [
   "Dr. Pat Ellar", "Dr. Achilles Heel", "Dr. Tommy John Madden", "Dr. Matthew Staph-ford",
   "Dr. Justin Herbal-Remedy", "Dr. Nick Foles-Acid", "Dr. Sack Roiliac", "Dr. Fourth-and-Ibuprofen",
-  "Dr. Two-Minute Warning Label", "Dr. Bill Belichec-Up", "Dr. Tight End-oscopy", "Dr. Hail Mary Poppins",
+  "Dr. Two-Minute Warning Label", "Dr. Bill Belicheck-Up", "Dr. Tight End-oscopy", "Dr. Hail Mary Poppins",
   "Dr. Dak Prescription", "Dr. Derrick Hernia", "Dr. Josh Allen Wrench", "Dr. Cam Newton-Meter",
   "Dr. Deflate-Gate-orade", "Dr. Fumble Fingers", "Dr. Wide Receiver-Rx", "Dr. Patrick Mahomeopathy",
 ];
@@ -753,9 +794,9 @@ function chartPage(pid, p, entries) {
 
   const ul = el("ul", "leagues");
   ul.append(el("h3", null, `Starting in ${entries.length} league${entries.length > 1 ? "s" : ""}`));
-  for (const { league, slot } of entries) {
+  for (const { league, slot, rec } of entries) {
     const li = el("li");
-    li.append(el("span", "check", "✓"), leagueAvatar(league), el("span", "lname", league.name));
+    li.append(el("span", "check", "✓"), leagueAvatar(league), el("span", "lname", league.name), el("span", "rec", rec.label));
     if (slot) li.append(el("span", "pill slot", slotLabel(slot)));
     ul.append(li);
   }
@@ -814,7 +855,7 @@ function leagueBed({ league, rows }, i) {
   const paper = el("div", "paper");
   const head = el("div", "chart-head");
   const titles = el("div");
-  titles.append(el("div", "chart-title", "✚ League chart"), el("div", "chart-id", `${rows.length} patient${rows.length > 1 ? "s" : ""}`));
+  titles.append(el("div", "chart-title", "✚ League chart"), el("div", "chart-id", `${rows.length} patient${rows.length > 1 ? "s" : ""} \u00B7 ${rows[0].entry.rec.label}`));
   head.append(titles, leagueAvatar(league));
   paper.append(head, el("h2", "name", league.name));
   paper.lastChild.style.margin = "12px 0 2px";
@@ -836,7 +877,8 @@ function renderByLeague(shown) {
   const arr = [...groups.values()];
   for (const g of arr) g.rows.sort((a, b) => SEVERITY[a.p.st] - SEVERITY[b.p.st]);
   const worst = (g) => Math.min(...g.rows.map((r) => SEVERITY[r.p.st]));
-  arr.sort((a, b) => worst(a) - worst(b) || b.rows.length - a.rows.length);
+  const pct = (g) => g.rows[0].entry.rec.pct ?? 0.5;
+  arr.sort((a, b) => (sortMode === "record" ? pct(b) - pct(a) : 0) || worst(a) - worst(b) || b.rows.length - a.rows.length);
   arr.forEach((g, i) => results.append(leagueBed(g, i)));
 }
 
@@ -885,7 +927,7 @@ function render({ animate = false } = {}) {
     return;
   }
 
-  shown.sort((a, b) => SEVERITY[a.p.st] - SEVERITY[b.p.st] || b.entries.length - a.entries.length);
+  shown.sort(comparePatients);
 
   const clip = el("div", "clip");
   clip.append(el("h2", null, `${shown.length} patient${shown.length > 1 ? "s" : ""} in the physio room`));
@@ -903,6 +945,7 @@ function render({ animate = false } = {}) {
     hiddenStarted && `${hiddenStarted} hidden: game already started`,
     hiddenNotOut && `${hiddenNotOut} hidden: not OUT`,
     !last.games && "Couldn't load game times, so showing everyone",
+    sortMode === "record" && "Sorted by league record",
   ].filter(Boolean);
   if (notes.length) clip.append(el("div", "meta", notes.join(" · ")));
   results.append(clip);
@@ -963,6 +1006,12 @@ syncSound();
 for (const [box, key] of [[hideBox, "fd_hide_started"], [onlyOutBox, "fd_only_out"], [byLeagueBox, "fd_by_league"]]) {
   box.addEventListener("change", () => { store(key, box.checked ? "1" : "0"); render(); });
 }
+
+document.querySelectorAll("input[name=sort]").forEach((r) => r.addEventListener("change", () => {
+  sortMode = r.value;
+  store("fd_sort", sortMode);
+  render();
+}));
 
 async function refresh() {
   if (busy || !last) return;
