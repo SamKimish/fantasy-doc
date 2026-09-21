@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<title>Fantasy Doc</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --card: #ffffff; --text: #16202a; --muted: #6b7785; --border: #e2e7ee;
+    --accent: #0a7f5a; --out: #d92d3a; --doubtful: #e8590c; --questionable: #d9a400; --ir: #7a3fd1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --card: #182028; --text: #e8edf2; --muted: #93a0ae; --border: #26313c; --accent: #2fc593; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 0 16px env(safe-area-inset-bottom);
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 0 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  .tag { color: var(--muted); margin: 0 0 20px; }
+  form { display: flex; gap: 8px; margin-bottom: 16px; }
+  input {
+    flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; color: var(--text);
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  }
+  button {
+    padding: 12px 18px; font-size: 16px; font-weight: 600; color: #fff; background: var(--accent);
+    border: 0; border-radius: 10px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; }
+  .status { color: var(--muted); margin: 12px 0; }
+  .error { color: var(--out); }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .name { font-weight: 650; }
+  .meta { color: var(--muted); font-size: .9rem; }
+  .badge {
+    flex: none; font-size: .75rem; font-weight: 700; color: #fff; padding: 3px 9px;
+    border-radius: 999px; text-transform: uppercase; letter-spacing: .03em;
+  }
+  .s-out { background: var(--out); } .s-doubtful { background: var(--doubtful); }
+  .s-questionable { background: var(--questionable); } .s-ir { background: var(--ir); }
+  ul { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+  li { padding: 6px 0; font-size: .95rem; }
+  .summary { margin: 0 0 12px; font-weight: 600; }
+  .all-good { text-align: center; padding: 28px 14px; }
+  footer { color: var(--muted); font-size: .8rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fantasy <span>Doc</span></h1>
+  <p class="tag">Injured players in your starting lineups, across all your NFL leagues.</p>
+
+  <form id="form">
+    <input id="username" placeholder="Sleeper username" autocomplete="username"
+           autocapitalize="none" autocorrect="off" spellcheck="false" required>
+    <button id="go" type="submit">Check</button>
+  </form>
+
+  <div id="status" class="status" role="status"></div>
+  <div id="results"></div>
+
+  <footer>Best ball leagues are excluded. Data from the Sleeper API.</footer>
+</main>
+
+<script>
+const API = "https://api.sleeper.app/v1";
+const PLAYERS_KEY = "fd_players_v1";
+const PLAYERS_TTL = 6 * 60 * 60 * 1000; // Sleeper asks apps not to refetch this often
+// Injury statuses worth flagging (Sus = suspension, not an injury)
+const SEVERITY = { Out: 0, IR: 1, PUP: 1, Doubtful: 2, Questionable: 3, COV: 3, DNR: 3 };
+const LABEL = { IR: "IR", PUP: "PUP", COV: "COVID", DNR: "DNR" };
+
+const $ = (id) => document.getElementById(id);
+const form = $("form"), input = $("username"), go = $("go"), statusEl = $("status"), results = $("results");
+
+try { input.value = localStorage.getItem("fd_username") || ""; } catch {}
+
+async function getJSON(path) {
+  const res = await fetch(API + path);
+  if (!res.ok) throw new Error(`Sleeper request failed (${res.status})`);
+  return res.json();
+}
+
+// The full player list is huge (~5MB), so keep only what we need and cache it.
+async function getPlayers() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(PLAYERS_KEY));
+    if (cached && Date.now() - cached.t < PLAYERS_TTL) return cached.p;
+  } catch {}
+  const all = await getJSON("/players/nfl");
+  const p = {};
+  for (const [id, x] of Object.entries(all)) {
+    p[id] = [
+      x.full_name || [x.first_name, x.last_name].filter(Boolean).join(" ") || id,
+      x.position || "", x.team || "FA", x.injury_status || "", x.injury_body_part || "",
+    ];
+  }
+  try { localStorage.setItem(PLAYERS_KEY, JSON.stringify({ t: Date.now(), p })); } catch {}
+  return p;
+}
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.className = "status" + (isError ? " error" : "");
+}
+
+async function run(username) {
+  results.replaceChildren();
+  setStatus("Looking up your account…");
+  const user = await getJSON("/user/" + encodeURIComponent(username));
+  if (!user || !user.user_id) throw new Error(`No Sleeper user named "${username}".`);
+
+  setStatus("Loading your leagues…");
+  const { season } = await getJSON("/state/nfl");
+  const leagues = (await getJSON(`/user/${user.user_id}/leagues/nfl/${season}`))
+    .filter((l) => !(l.settings && l.settings.best_ball === 1));
+  if (!leagues.length) {
+    setStatus("No non-best-ball NFL leagues found for " + season + ".");
+    return;
+  }
+
+  setStatus(`Checking ${leagues.length} league${leagues.length > 1 ? "s" : ""}…`);
+  const [players, rosters] = await Promise.all([
+    getPlayers(),
+    Promise.all(leagues.map((l) => getJSON(`/league/${l.league_id}/rosters`).catch(() => []))),
+  ]);
+
+  // player id -> { info, leagues: [names] }
+  const flagged = new Map();
+  leagues.forEach((league, i) => {
+    const mine = rosters[i].find(
+      (r) => r.owner_id === user.user_id || (r.co_owners || []).includes(user.user_id)
+    );
+    if (!mine) return;
+    for (const pid of mine.starters || []) {
+      const info = players[pid];
+      if (!info || !(info[3] in SEVERITY)) continue;
+      if (!flagged.has(pid)) flagged.set(pid, { info, leagues: [] });
+      flagged.get(pid).leagues.push(league.name);
+    }
+  });
+
+  render(user.display_name || username, [...flagged.values()], leagues.length);
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function render(name, list, leagueCount) {
+  results.replaceChildren();
+  if (!list.length) {
+    setStatus("");
+    const card = el("div", "card all-good");
+    card.append(el("div", "name", "All clear 🎉"),
+      el("div", "meta", `No injured starters across ${leagueCount} league${leagueCount > 1 ? "s" : ""}.`));
+    results.append(card);
+    return;
+  }
+  list.sort((a, b) => SEVERITY[a.info[3]] - SEVERITY[b.info[3]] || b.leagues.length - a.leagues.length);
+  setStatus("");
+  results.append(el("p", "summary",
+    `${list.length} injured starter${list.length > 1 ? "s" : ""} across ${leagueCount} league${leagueCount > 1 ? "s" : ""}`));
+
+  for (const { info, leagues } of list) {
+    const [pname, pos, team, status, body] = info;
+    const card = el("div", "card");
+    const row = el("div", "row");
+    const left = el("div");
+    left.append(el("div", "name", pname),
+      el("div", "meta", [pos, team, body].filter(Boolean).join(" · ")));
+    const sev = SEVERITY[status];
+    row.append(left, el("span", "badge " + ["s-out", "s-ir", "s-doubtful", "s-questionable"][sev], LABEL[status] || status));
+    const ul = el("ul");
+    for (const l of leagues) ul.append(el("li", null, l));
+    card.append(row, ul);
+    results.append(card);
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = input.value.trim();
+  if (!username) return;
+  try { localStorage.setItem("fd_username", username); } catch {}
+  go.disabled = true;
+  try { await run(username); }
+  catch (err) { results.replaceChildren(); setStatus(err.message || "Something went wrong.", true); }
+  finally { go.disabled = false; }
+});
+</script>
+</body>
+</html>
