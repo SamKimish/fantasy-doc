@@ -4,8 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e7c7b">
+<meta name="description" content="Injured starters across your Sleeper NFL leagues, on a patient clipboard.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fantasy Doc">
 <title>Fantasy Doc</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7c7b'/%3E%3Cpath d='M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <style>
   :root {
     --room: #e7f3f2; --tile: #d3e6e4; --card: #ffffff; --sheet: #eaf5f8; --sheet-line: #cfe4ea;
@@ -36,6 +42,8 @@
     padding: 0 16px env(safe-area-inset-bottom);
   }
   main { max-width: 640px; margin: 0 auto; padding: 20px 0 56px; }
+  button { font: inherit; }
+  button:focus-visible, #username:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
 
   /* ---------- header: door plate ---------- */
   .plate {
@@ -46,19 +54,29 @@
   .plate svg { flex: none; width: 46px; height: 46px; }
   .plate h1 { margin: 0; font-size: 1.55rem; line-height: 1.1; letter-spacing: .01em; }
   .plate p { margin: 2px 0 0; font-size: .85rem; opacity: .9; text-transform: uppercase; letter-spacing: .12em; }
+  .plate .grow { flex: 1; }
+  .icon-btn {
+    flex: none; width: 44px; height: 44px; padding: 0; font-size: 1.3rem; line-height: 1; color: #fff;
+    background: rgba(255, 255, 255, .16); border: 2px solid rgba(255, 255, 255, .5); border-radius: 12px; cursor: pointer;
+  }
+  .icon-btn[aria-pressed="true"] { background: rgba(255, 255, 255, .32); border-color: #fff; }
 
   /* ---------- check-in form ---------- */
   .checkin { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
   .checkin > label[for] { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-  .checkin .fields { display: flex; gap: 8px; }
+  .checkin .row { display: flex; gap: 8px; }
   #username {
     flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; color: var(--text);
     background: var(--room); border: 1px solid var(--border); border-radius: 10px;
   }
-  #username:focus-visible, button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+  #go {
+    padding: 12px 18px; font-size: 16px; font-weight: 700; color: #fff; background: var(--teal);
+    border: 0; border-bottom: 3px solid var(--teal-dark); border-radius: 10px; cursor: pointer;
+  }
+  #go:disabled { opacity: .6; cursor: default; }
 
-  /* game-started toggle */
-  .toggle { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--border); cursor: pointer; font-size: .92rem; }
+  .toggles { margin-top: 14px; padding-top: 4px; border-top: 1px dashed var(--border); }
+  .toggle { display: flex; align-items: center; gap: 10px; margin-top: 10px; cursor: pointer; font-size: .92rem; }
   .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .switch { flex: none; position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--frame); transition: background .15s; }
   .switch::after {
@@ -68,15 +86,19 @@
   .toggle input:checked + .switch { background: var(--teal); }
   .toggle input:checked + .switch::after { transform: translateX(18px); }
   .toggle input:focus-visible + .switch { outline: 3px solid var(--teal); outline-offset: 2px; }
-  .toggle small { display: block; color: var(--muted); font-size: .78rem; }
-  @media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
-  button {
-    padding: 12px 18px; font-size: 16px; font-weight: 700; color: #fff; background: var(--teal);
-    border: 0; border-bottom: 3px solid var(--teal-dark); border-radius: 10px; cursor: pointer;
-  }
-  button:disabled { opacity: .6; cursor: default; }
 
-  .status { color: var(--muted); margin: 16px 2px 0; min-height: 1.4em; }
+  /* ---------- toolbar (refresh / copy link) ---------- */
+  .bar { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .bar[hidden] { display: none; }
+  .bar .grow { flex: 1; min-width: 0; font-size: .82rem; color: var(--muted); line-height: 1.3; }
+  .mini {
+    flex: none; padding: 8px 12px; font-size: .85rem; font-weight: 700; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 10px; cursor: pointer;
+  }
+  .mini:disabled { opacity: .6; cursor: default; }
+
+  .status { color: var(--muted); margin: 12px 2px 0; min-height: 1.4em; }
+  .status:empty { min-height: 0; margin: 0; }
   .error { color: var(--out); font-weight: 600; }
 
   /* ---------- loading: ECG scan ---------- */
@@ -86,7 +108,7 @@
 
   /* ---------- clipboard summary ---------- */
   .clip {
-    position: relative; margin: 18px 0 8px; padding: 18px 16px 14px; background: var(--card);
+    position: relative; margin: 22px 0 8px; padding: 18px 16px 14px; background: var(--card);
     border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
   }
   .clip::before { /* clipboard clip */
@@ -134,10 +156,24 @@
   }
   .chart-head {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    padding-bottom: 8px; border-bottom: 2px solid var(--text); margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--text); margin-bottom: 4px;
   }
   .chart-title { font-weight: 800; font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; }
   .chart-id { font: 600 .72rem ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
+
+  /* pages: swipe or tap the tabs */
+  .tabs { display: flex; margin-bottom: 2px; }
+  .tab {
+    flex: 1; padding: 8px 4px 7px; font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); background: none; border: 0; border-bottom: 3px solid var(--paper-rule); cursor: pointer;
+  }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--st, var(--teal)); }
+  .scroller {
+    display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; transition: height .2s ease;
+  }
+  .scroller::-webkit-scrollbar { display: none; }
+  .panel { flex: 0 0 100%; min-width: 0; align-self: flex-start; scroll-snap-align: start; padding: 12px 4px 2px; }
 
   .patient { display: flex; gap: 12px; align-items: flex-start; }
   .photo { /* ID photo, taped on */
@@ -180,10 +216,34 @@
     flex: none; width: 18px; height: 18px; display: grid; place-items: center; border: 2px solid var(--text);
     border-radius: 3px; font-size: .8rem; font-weight: 900; line-height: 1; color: var(--st);
   }
-  .leagues img { width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--room); }
+  .leagues img, .lavatar { width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--room); }
   .leagues .lname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sign { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--paper-rule); font-size: .7rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
   .sign em { font: italic 1.05rem Georgia, "Times New Roman", serif; color: var(--text); text-transform: none; letter-spacing: 0; margin-left: 6px; }
+
+  /* bench cover / waiver pages */
+  .cover-head { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; font-weight: 750; font-size: .95rem; }
+  .cover-head:first-child { margin-top: 0; }
+  .cover-head .lname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cover-note { font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
+  .empty { padding: 8px 10px; font-size: .9rem; color: var(--muted); background: var(--sheet); border: 1px dashed var(--sheet-line); border-radius: 8px; }
+  .cand { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px dotted var(--paper-rule); }
+  .cover-head + .cover-note + .cand, .cover-head + .cand { border-top: 0; }
+  .cand .avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+  .cand .avatar.fallback { font-size: .9rem; }
+  .cmid { flex: 1; min-width: 0; }
+  .cname { font-weight: 700; font-size: .95rem; line-height: 1.2; margin-bottom: 3px; }
+  .cgame { flex: none; text-align: right; font-size: .78rem; color: var(--muted); max-width: 30%; }
+
+  /* group-by-league rows */
+  .prow { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px dotted var(--paper-rule); }
+  .prow:first-of-type { border-top: 0; }
+  .prow .photo { padding: 3px 3px 8px; }
+  .prow .avatar { width: 46px; height: 46px; }
+  .prow .avatar.fallback { font-size: 1rem; }
+  .pname { font-weight: 800; font-size: 1.02rem; line-height: 1.2; margin-bottom: 4px; }
+  .cover-line { margin-top: 5px; font-size: .82rem; }
+  .cover-line b { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
 
   .clear { text-align: center; padding: 26px 16px; margin-top: 18px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
   .clear .big { font-size: 1.25rem; font-weight: 800; color: var(--rb); margin-bottom: 4px; }
@@ -192,40 +252,60 @@
 
   footer { color: var(--muted); font-size: .8rem; margin-top: 8px; text-align: center; }
 
+  /* ---------- motion ---------- */
   @keyframes sweep { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
-  .ecg.live { stroke-dasharray: 260; animation: sweep 2.4s linear infinite; }
-  @media (prefers-reduced-motion: reduce) { .ecg.live { animation: none; stroke-dasharray: none; } }
-  @media (max-width: 380px) { .avatar { width: 58px; height: 58px; } .stamp { font-size: .75rem; } }
+  .ecg.live { stroke-dasharray: 260; animation: sweep var(--beat, 2.4s) linear infinite; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes slam {
+    from { opacity: 0; transform: rotate(-9deg) scale(2.3); }
+    60% { opacity: .95; }
+    to { opacity: .9; transform: rotate(4deg) scale(1); }
+  }
+  .enter .bed { animation: rise .45s ease both; animation-delay: calc(var(--i, 0) * 80ms); }
+  .enter .stamp { animation: slam .4s cubic-bezier(.2, 1.5, .4, 1) both; animation-delay: calc(var(--i, 0) * 80ms + .3s); }
+  @media (prefers-reduced-motion: reduce) {
+    .ecg.live { animation: none; stroke-dasharray: none; }
+    .enter .bed, .enter .stamp { animation: none; }
+    .scroller, .switch, .switch::after { transition: none; }
+  }
+  @media (max-width: 380px) { .avatar { width: 58px; height: 58px; } .stamp { font-size: .75rem; } .cand .avatar { width: 40px; height: 40px; } .prow .avatar { width: 46px; height: 46px; } }
 </style>
 </head>
 <body>
 <main>
   <header class="plate">
     <svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#fff"/><path d="M19 8h10v11h11v10H29v11H19V29H8V19h11z" fill="#0e7c7b"/></svg>
-    <div>
+    <div class="grow">
       <h1>Fantasy Doc</h1>
       <p>Physio Room</p>
     </div>
+    <button id="sound" class="icon-btn" type="button" aria-pressed="false" aria-label="Heartbeat sound" title="Heartbeat sound: off">🔇</button>
   </header>
 
   <form id="form" class="checkin">
     <label for="username">Patient check-in</label>
-    <div class="fields">
+    <div class="row">
       <input id="username" placeholder="Sleeper username" autocomplete="username"
              autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <button id="go" type="submit">Check in</button>
     </div>
-    <label class="toggle">
-      <input type="checkbox" id="hideStarted" checked>
-      <span class="switch" aria-hidden="true"></span>
-      <span>Hide games that have started</span>
-    </label>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="hideStarted" checked><span class="switch" aria-hidden="true"></span><span>Hide games that have started</span></label>
+      <label class="toggle"><input type="checkbox" id="onlyOut"><span class="switch" aria-hidden="true"></span><span>Only show OUT players</span></label>
+      <label class="toggle"><input type="checkbox" id="byLeague"><span class="switch" aria-hidden="true"></span><span>Group by league</span></label>
+    </div>
   </form>
+
+  <div id="bar" class="bar" hidden>
+    <div id="updated" class="grow"></div>
+    <button id="refresh" class="mini" type="button">↻ Refresh</button>
+    <button id="copy" class="mini" type="button">🔗 Copy link</button>
+  </div>
 
   <div id="status" class="status" role="status"></div>
   <div id="results"></div>
 
-  <footer>Best ball leagues are excluded &middot; Data from the Sleeper API</footer>
+  <footer>Best ball leagues are excluded &middot; Data from Sleeper and ESPN</footer>
 </main>
 
 <script>
@@ -233,20 +313,39 @@ const API = "https://api.sleeper.app/v1";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 const TEAM_FIX = { WSH: "WAS" }; // ESPN -> Sleeper team abbreviations
 const CDN = "https://sleepercdn.com";
-const PLAYERS_KEY = "fd_players_v2";
+const PLAYERS_KEY = "fd_players_v3";
 const PLAYERS_TTL = 6 * 60 * 60 * 1000; // Sleeper asks apps not to refetch this often
+const REFRESH_MS = 5 * 60 * 1000;
 // Injury statuses worth flagging (Sus = suspension, not an injury). Lower = more severe.
 const SEVERITY = { Out: 0, IR: 1, PUP: 1, Doubtful: 2, Questionable: 3, COV: 3, DNR: 3 };
 const LABEL = { IR: "IR", PUP: "PUP", COV: "COVID", DNR: "DNR" };
 const ST_CLASS = ["st-out", "st-ir", "st-doubtful", "st-questionable"];
 const POS_CLASS = { QB: "QB", RB: "RB", WR: "WR", TE: "TE", K: "K", DEF: "DEF" };
+// Which player positions can fill each Sleeper lineup slot
+const SLOT_POS = {
+  QB: ["QB"], RB: ["RB"], WR: ["WR"], TE: ["TE"], K: ["K"], DEF: ["DEF"],
+  FLEX: ["RB", "WR", "TE"], WRRB_FLEX: ["WR", "RB"], REC_FLEX: ["WR", "TE"], SUPER_FLEX: ["QB", "RB", "WR", "TE"],
+  DL: ["DL"], LB: ["LB"], DB: ["DB"], IDP_FLEX: ["DL", "LB", "DB"],
+};
+const SLOT_LABEL = { SUPER_FLEX: "SFLX", FLEX: "FLX", WRRB_FLEX: "W/R", REC_FLEX: "W/T", IDP_FLEX: "IDP" };
+const slotLabel = (s) => SLOT_LABEL[s] || s;
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), input = $("username"), go = $("go"), statusEl = $("status"), results = $("results");
-const hideBox = $("hideStarted");
-let last = null; // latest fetched data, so the toggle can re-render without refetching
-try { input.value = localStorage.getItem("fd_username") || ""; } catch {}
-try { hideBox.checked = localStorage.getItem("fd_hide_started") !== "0"; } catch {}
+const hideBox = $("hideStarted"), onlyOutBox = $("onlyOut"), byLeagueBox = $("byLeague");
+const bar = $("bar"), updatedEl = $("updated"), refreshBtn = $("refresh"), copyBtn = $("copy"), soundBtn = $("sound");
+
+let last = null;   // latest fetched data, so toggles can re-render without refetching
+let busy = false;  // a check-in or refresh is in flight
+const pageState = new Map(); // player id -> which clipboard page is showing
+
+function store(key, val) { try { localStorage.setItem(key, val); } catch {} }
+function load(key) { try { return localStorage.getItem(key); } catch { return null; } }
+
+hideBox.checked = load("fd_hide_started") !== "0";
+onlyOutBox.checked = load("fd_only_out") === "1";
+byLeagueBox.checked = load("fd_by_league") === "1";
+let soundOn = load("fd_sound") === "1";
 
 async function getJSON(path) {
   const res = await fetch(API + path);
@@ -258,7 +357,7 @@ async function getJSON(path) {
 async function getPlayers() {
   try {
     const cached = JSON.parse(localStorage.getItem(PLAYERS_KEY));
-    if (cached && Date.now() - cached.t < PLAYERS_TTL) return cached.p;
+    if (cached && Date.now() - cached.t < PLAYERS_TTL) return cached;
   } catch {}
   const all = await getJSON("/players/nfl");
   const p = {};
@@ -266,13 +365,34 @@ async function getPlayers() {
     if (!x.team && !x.injury_status) continue;
     p[id] = {
       n: x.full_name || [x.first_name, x.last_name].filter(Boolean).join(" ") || id,
-      pos: x.position || "", team: x.team || "", st: x.injury_status || "",
+      pos: x.position || "", fpos: x.fantasy_positions || (x.position ? [x.position] : []),
+      team: x.team || "", st: x.injury_status || "", act: x.status || "", rk: x.search_rank ?? 9999999,
       body: x.injury_body_part || "", notes: x.injury_notes || "", since: x.injury_start_date || "",
       no: x.number || "", age: x.age || "", ht: x.height || "", wt: x.weight || "",
     };
   }
-  try { localStorage.setItem(PLAYERS_KEY, JSON.stringify({ t: Date.now(), p })); } catch {}
-  return p;
+  const entry = { t: Date.now(), p };
+  try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(entry)); localStorage.removeItem("fd_players_v2"); } catch {}
+  return entry;
+}
+
+// This week's games from ESPN: team -> { kicked, state, date }. null = couldn't find out.
+async function getGames(week, seasonType) {
+  try {
+    const type = { pre: 1, regular: 2, post: 3 }[seasonType] || 2;
+    const res = await fetch(`${ESPN}/scoreboard?week=${week}&seasontype=${type}`);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const games = new Map(), now = Date.now();
+    for (const ev of data.events || []) {
+      const state = ev.status.type.state, date = new Date(ev.date);
+      const kicked = state !== "pre" || date.getTime() <= now;
+      for (const c of ev.competitions[0].competitors) {
+        games.set(TEAM_FIX[c.team.abbreviation] || c.team.abbreviation, { kicked, state, date });
+      }
+    }
+    return games.size ? games : null;
+  } catch { return null; }
 }
 
 function setStatus(msg, isError) {
@@ -287,69 +407,103 @@ function el(tag, cls, text) {
   return e;
 }
 
-// ---------- SVG helpers ----------
+// ---------- ECG ----------
 const NS = "http://www.w3.org/2000/svg";
-const BEAT = "M0 15 H14 L18 6 L23 24 L28 2 L33 20 L36 15 H56 L60 8 L64 22 L67 15 H120";
-function ecg(flat, live) {
+const BEATS = {
+  steady: "M0 15 H14 L18 6 L23 24 L28 2 L33 20 L36 15 H56 L60 8 L64 22 L67 15 H120",
+  racing: "M0 15 H8 L11 8 L15 22 L18 3 L22 24 L25 15 H34 L37 9 L41 21 L44 15 H60 L64 2 L70 28 L76 15 H90 L93 10 L96 20 L99 15 H120",
+  flat: "M0 15 H120",
+};
+function ecg(kind, live) {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 120 28");
   svg.setAttribute("aria-hidden", "true");
   const path = document.createElementNS(NS, "path");
-  path.setAttribute("d", flat ? "M0 15 H120" : BEAT);
-  path.setAttribute("class", "ecg" + (live && !flat ? " live" : ""));
+  path.setAttribute("d", BEATS[kind]);
+  path.setAttribute("class", "ecg" + (live && kind !== "flat" ? " live" : ""));
   svg.append(path);
   return svg;
 }
 
-// ---------- data ----------
-// Teams whose game this week has kicked off (or finished). null = couldn't find out.
-async function getStartedTeams(week, seasonType) {
-  try {
-    const type = { pre: 1, regular: 2, post: 3 }[seasonType] || 2;
-    const res = await fetch(`${ESPN}/scoreboard?week=${week}&seasontype=${type}`);
-    if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    const started = new Set(), now = Date.now();
-    for (const ev of data.events || []) {
-      const kickedOff = ev.status.type.state !== "pre" || new Date(ev.date).getTime() <= now;
-      if (!kickedOff) continue;
-      for (const c of ev.competitions[0].competitors) {
-        started.add(TEAM_FIX[c.team.abbreviation] || c.team.abbreviation);
-      }
-    }
-    return started;
-  } catch { return null; }
+// ---------- games ----------
+function hasStarted(team) {
+  const g = last && last.games && last.games.get(team);
+  return !!(g && g.kicked);
 }
 
-async function run(username) {
-  results.replaceChildren();
-  showScan("Checking you in…");
+function gameLabel(team) {
+  if (!last || !last.games) return "";
+  const g = last.games.get(team);
+  if (!g) return "Bye week";
+  if (g.state === "post") return "Final";
+  if (g.state === "in") return "In progress";
+  if (g.kicked) return "Kicked off";
+  return g.date.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+
+// ---------- replacements: bench + waivers ----------
+function benchOf(roster) {
+  if (!roster) return [];
+  const out = new Set([...(roster.starters || []), ...(roster.reserve || []), ...(roster.taxi || [])]);
+  return (roster.players || []).filter((id) => !out.has(id));
+}
+
+function usable(p, allowed) {
+  if (!p || !p.team) return false;
+  if (p.act !== "Active" && p.pos !== "DEF") return false;
+  if (p.st === "Sus" || (p.st in SEVERITY && SEVERITY[p.st] <= 1)) return false; // suspended / Out / IR / PUP
+  if (!p.fpos.some((x) => allowed.includes(x))) return false;
+  if (last.games && !last.games.has(p.team)) return false; // bye week
+  return true;
+}
+
+// kind: "bench" (healthy bench players) or "waivers" (free agents); best Sleeper rank first
+function candidates(kind, entry, injured, limit = 3) {
+  const info = last.info.get(entry.league.league_id);
+  const allowed = SLOT_POS[entry.slot] || [injured.pos];
+  const ids = kind === "bench" ? benchOf(info.mine) : Object.keys(last.players).filter((id) => !info.rostered.has(id));
+  const hideKicked = hideBox.checked && last.games;
+  let list = ids
+    .map((id) => ({ pid: id, p: last.players[id] }))
+    .filter(({ p }) => usable(p, allowed) && !(hideKicked && hasStarted(p.team)));
+  list.sort((a, b) => (kind === "bench" ? hasStarted(a.p.team) - hasStarted(b.p.team) : 0) || a.p.rk - b.p.rk);
+  // show the position that makes them eligible for this slot (e.g. a WR/DB listed as WR)
+  return list.slice(0, limit).map(({ pid, p }) => ({ pid, p, pos: p.fpos.find((x) => allowed.includes(x)) || p.pos }));
+}
+
+// ---------- data ----------
+async function run(username, { quiet = false } = {}) {
+  if (!quiet) { results.replaceChildren(); showScan("Checking you in…"); }
   const user = await getJSON("/user/" + encodeURIComponent(username));
   if (!user || !user.user_id) throw new Error(`No Sleeper user named "${username}".`);
 
-  showScan("Finding your leagues…");
+  if (!quiet) showScan("Finding your leagues…");
   const { season, week, season_type } = await getJSON("/state/nfl");
   const leagues = (await getJSON(`/user/${user.user_id}/leagues/nfl/${season}`))
     .filter((l) => !(l.settings && l.settings.best_ball === 1));
   if (!leagues.length) {
     results.replaceChildren();
+    bar.hidden = true;
+    last = null;
     setStatus(`No non-best-ball NFL leagues found for ${season}.`);
     return;
   }
 
-  showScan(`Examining ${leagues.length} league${leagues.length > 1 ? "s" : ""}…`);
-  const [players, started, rosters] = await Promise.all([
+  if (!quiet) showScan(`Examining ${leagues.length} league${leagues.length > 1 ? "s" : ""}…`);
+  const [pl, games, rosters] = await Promise.all([
     getPlayers(),
-    getStartedTeams(week, season_type),
+    getGames(week, season_type),
     Promise.all(leagues.map((l) => getJSON(`/league/${l.league_id}/rosters`).catch(() => []))),
   ]);
+  const players = pl.p;
 
-  // player id -> { pid, p, entries: [{ league, slot }] }
-  const flagged = new Map();
+  const info = new Map();   // league id -> { rostered: Set of every rostered player, mine: my roster }
+  const flagged = new Map(); // player id -> { pid, p, entries: [{ league, slot }] }
   leagues.forEach((league, i) => {
-    const mine = rosters[i].find(
-      (r) => r.owner_id === user.user_id || (r.co_owners || []).includes(user.user_id)
-    );
+    const rostered = new Set();
+    for (const r of rosters[i]) for (const id of [...(r.players || []), ...(r.reserve || []), ...(r.taxi || [])]) rostered.add(id);
+    const mine = rosters[i].find((r) => r.owner_id === user.user_id || (r.co_owners || []).includes(user.user_id));
+    info.set(league.league_id, { rostered, mine });
     if (!mine) return;
     const slots = (league.roster_positions || []).filter((s) => s !== "BN");
     (mine.starters || []).forEach((pid, idx) => {
@@ -360,19 +514,22 @@ async function run(username) {
     });
   });
 
-  last = { list: [...flagged.values()], leagueCount: leagues.length, started };
-  render();
+  if (!quiet) { docMap.clear(); doctorOrder = shuffled(DOCTORS); pageState.clear(); }
+  last = { username, list: [...flagged.values()], leagueCount: leagues.length, games, players, playersT: pl.t, info, updated: Date.now() };
+  render({ animate: !quiet });
 }
 
 function showScan(msg) {
   setStatus("");
+  bar.hidden = true;
   const box = el("div", "scan");
   box.style.setProperty("--st", "var(--teal)");
-  box.append(ecg(false, true), el("span", null, msg));
+  box.append(ecg("steady", true), el("span", null, msg));
+  results.classList.remove("enter");
   results.replaceChildren(box);
 }
 
-// ---------- rendering ----------
+// ---------- small pieces ----------
 function statusPill(status, extra) {
   return el("span", "pill status " + ST_CLASS[SEVERITY[status]] + (extra ? " " + extra : ""), LABEL[status] || status);
 }
@@ -405,10 +562,16 @@ function avatar(id, name) {
   const img = el("img", "avatar");
   img.alt = name; img.loading = "lazy";
   img.src = `${CDN}/content/nfl/players/thumb/${id}.jpg`;
-  img.onerror = () => {
-    const fb = el("div", "avatar fallback", initials(name));
-    img.replaceWith(fb);
-  };
+  img.onerror = () => img.replaceWith(el("div", "avatar fallback", initials(name)));
+  return img;
+}
+
+function leagueAvatar(league) {
+  const img = el("img", "lavatar");
+  img.alt = ""; img.loading = "lazy";
+  if (league.avatar) img.src = `${CDN}/avatars/thumb/${league.avatar}`;
+  else img.style.visibility = "hidden";
+  img.onerror = () => { img.style.visibility = "hidden"; };
   return img;
 }
 
@@ -441,17 +604,110 @@ function shuffled(arr) {
   return a;
 }
 
-function bed(pid, p, entries, doctor) {
-  const sev = SEVERITY[p.st];
-  const flat = sev <= 1; // Out / IR: flatline
-  const board = el("article", "bed " + ST_CLASS[sev]);
-  const paper = el("div", "paper");
+// A doctor stays with their chart until the next check-in, however you filter or refresh
+let doctorOrder = shuffled(DOCTORS);
+const docMap = new Map();
+function doctorFor(key) {
+  if (!docMap.has(key)) docMap.set(key, doctorOrder[docMap.size % doctorOrder.length]);
+  return docMap.get(key);
+}
 
-  const head = el("div", "chart-head");
-  const titles = el("div");
-  titles.append(el("div", "chart-title", "\u271A Patient chart"), el("div", "chart-id", "No. " + pid));
-  head.append(titles, el("div", "stamp", LABEL[p.st] || p.st));
+// ---------- clipboard pages ----------
+function pager(key, pages) {
+  const wrap = el("div", "pager");
+  const tabs = el("div", "tabs");
+  tabs.setAttribute("role", "tablist");
+  const scroller = el("div", "scroller");
+  const panels = pages.map((pg) => {
+    const panel = el("div", "panel");
+    panel.setAttribute("role", "tabpanel");
+    panel.append(pg.node);
+    return panel;
+  });
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let active = 0;
 
+  const btns = pages.map((pg, i) => {
+    const b = el("button", "tab", pg.label);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => scroller.scrollTo({ left: i * scroller.clientWidth, behavior: reduce ? "auto" : "smooth" }));
+    return b;
+  });
+  const setActive = (i) => {
+    active = i;
+    pageState.set(key, i);
+    btns.forEach((b, j) => b.setAttribute("aria-selected", String(j === i)));
+    scroller.style.height = panels[i].offsetHeight + "px";
+  };
+
+  let raf = 0;
+  scroller.addEventListener("scroll", () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const i = Math.round(scroller.scrollLeft / (scroller.clientWidth || 1));
+      if (i !== active) setActive(i);
+    });
+  }, { passive: true });
+
+  // keep the visible page's height (pages differ in length) and position in step with layout changes
+  let first = true, width = 0;
+  const ro = new ResizeObserver(() => {
+    // a card being replaced reports zero size as it detaches; don't let that reset its saved page
+    if (!scroller.isConnected || !scroller.clientWidth) return;
+    if (first) { first = false; scroller.scrollLeft = (pageState.get(key) || 0) * scroller.clientWidth; }
+    else if (scroller.clientWidth !== width) scroller.scrollLeft = active * scroller.clientWidth;
+    width = scroller.clientWidth;
+    setActive(Math.round(scroller.scrollLeft / (scroller.clientWidth || 1)));
+  });
+  panels.forEach((p) => ro.observe(p));
+  ro.observe(scroller);
+
+  active = pageState.get(key) || 0;
+  btns.forEach((b, j) => b.setAttribute("aria-selected", String(j === active)));
+  tabs.append(...btns);
+  scroller.append(...panels);
+  wrap.append(tabs, scroller);
+  return wrap;
+}
+
+function candRow(pid, p, pos) {
+  const row = el("div", "cand");
+  const mid = el("div", "cmid");
+  const tags = el("div", "tags");
+  tags.append(posPill(pos), teamPill(p.team));
+  if (p.st in SEVERITY) tags.append(statusPill(p.st));
+  mid.append(el("div", "cname", p.n), tags);
+  row.append(avatar(pid, p.n), mid, el("div", "cgame", gameLabel(p.team)));
+  return row;
+}
+
+function coverPage(kind, injured, entries) {
+  const page = el("div", "cover");
+  for (const entry of entries) {
+    const head = el("div", "cover-head");
+    head.append(leagueAvatar(entry.league), el("span", "lname", entry.league.name),
+      el("span", "pill slot", (kind === "bench" ? "For " : "Add for ") + slotLabel(entry.slot || injured.pos)));
+    page.append(head);
+    const list = candidates(kind, entry, injured);
+    if (!list.length) {
+      const still = hideBox.checked && last.games ? " with a game still to play" : "";
+      page.append(el("div", "empty", kind === "bench"
+        ? `No healthy bench players${still} can fill ${slotLabel(entry.slot || injured.pos)}.`
+        : `No suitable free agents${still} found.`));
+      continue;
+    }
+    const allowed = SLOT_POS[entry.slot] || [injured.pos];
+    page.append(el("div", "cover-note", allowed.includes("DEF")
+      ? "Sleeper doesn't rank defenses, so these are unordered."
+      : kind === "bench" ? "Bench players, best Sleeper rank first" : "Free agents, best Sleeper rank first"));
+    for (const { pid, p, pos } of list) page.append(candRow(pid, p, pos));
+  }
+  return page;
+}
+
+function chartPage(pid, p, entries) {
+  const page = el("div", "chart");
   const patient = el("div", "patient");
   const photo = el("div", "photo");
   photo.append(avatar(pid, p.n));
@@ -459,16 +715,21 @@ function bed(pid, p, entries, doctor) {
   const tags = el("div", "tags");
   tags.append(posPill(p.pos), teamPill(p.team));
   if (p.no) tags.append(el("span", "pill slot", "#" + p.no));
-  const vitals = [p.age && `${p.age} yrs`, p.ht && height(p.ht), p.wt && `${p.wt} lbs`].filter(Boolean).join(" \u00B7 ");
+  const vitals = [p.age && `${p.age} yrs`, p.ht && height(p.ht), p.wt && `${p.wt} lbs`].filter(Boolean).join(" · ");
   who.append(el("h2", "name", p.n), tags);
   if (vitals) who.append(el("div", "vitals", vitals));
   patient.append(photo, who);
 
+  const sev = SEVERITY[p.st];
   const mon = el("div", "monitor");
-  mon.append(ecg(flat, true), el("span", "bpm", flat ? "\u2014 \u2014 BPM" : sev === 2 ? "58 BPM" : "72 BPM"));
+  mon.style.setProperty("--beat", sev === 2 ? "1.2s" : "2.4s");
+  mon.append(ecg(sev <= 1 ? "flat" : sev === 2 ? "racing" : "steady", true),
+    el("span", "bpm", sev <= 1 ? "— — BPM" : sev === 2 ? "118 BPM" : "72 BPM"));
 
   const fields = el("div", "fields");
   fields.append(field("Injury", p.body || "Not specified"));
+  const game = gameLabel(p.team);
+  if (game) fields.append(field("Game", game));
   if (p.notes) fields.append(field("Notes", p.notes));
   if (p.since && shortDate(p.since)) fields.append(field("Since", shortDate(p.since)));
 
@@ -476,54 +737,143 @@ function bed(pid, p, entries, doctor) {
   ul.append(el("h3", null, `Starting in ${entries.length} league${entries.length > 1 ? "s" : ""}`));
   for (const { league, slot } of entries) {
     const li = el("li");
-    li.append(el("span", "check", "\u2713"));
-    const img = el("img"); img.alt = ""; img.loading = "lazy";
-    if (league.avatar) img.src = `${CDN}/avatars/thumb/${league.avatar}`;
-    else img.style.visibility = "hidden";
-    img.onerror = () => { img.style.visibility = "hidden"; };
-    li.append(img, el("span", "lname", league.name));
-    if (slot) li.append(el("span", "pill slot", slot.replace("SUPER_FLEX", "SFLX").replace("FLEX", "FLX")));
+    li.append(el("span", "check", "✓"), leagueAvatar(league), el("span", "lname", league.name));
+    if (slot) li.append(el("span", "pill slot", slotLabel(slot)));
     ul.append(li);
   }
+  page.append(patient, mon, fields, ul);
+  return page;
+}
 
+function signature(name) {
   const sign = el("div", "sign", "Attending physician:");
-  sign.append(el("em", null, doctor));
+  sign.append(el("em", null, name));
+  return sign;
+}
 
-  paper.append(head, patient, mon, fields, ul, sign);
+function bed(pid, p, entries, i) {
+  const board = el("article", "bed " + ST_CLASS[SEVERITY[p.st]]);
+  board.style.setProperty("--i", Math.min(i, 8));
+  const paper = el("div", "paper");
+
+  const head = el("div", "chart-head");
+  const titles = el("div");
+  titles.append(el("div", "chart-title", "✚ Patient chart"), el("div", "chart-id", "No. " + pid));
+  head.append(titles, el("div", "stamp", LABEL[p.st] || p.st));
+
+  paper.append(head, pager(pid, [
+    { label: "Chart", node: chartPage(pid, p, entries) },
+    { label: "Bench cover", node: coverPage("bench", p, entries) },
+    { label: "Waivers", node: coverPage("waivers", p, entries) },
+  ]), signature(doctorFor(pid)));
   board.append(paper);
   return board;
 }
 
-function render() {
+// ---------- group by league ----------
+function patientRow({ pid, p, entry }) {
+  const row = el("div", "prow " + ST_CLASS[SEVERITY[p.st]]);
+  const photo = el("div", "photo");
+  photo.append(avatar(pid, p.n));
+  const who = el("div", "who");
+  const tags = el("div", "tags");
+  tags.append(posPill(p.pos), teamPill(p.team), el("span", "pill slot", slotLabel(entry.slot || p.pos)), statusPill(p.st));
+  who.append(el("div", "pname", p.n), tags,
+    el("div", "vitals", [p.body || "Injury not specified", gameLabel(p.team)].filter(Boolean).join(" · ")));
+  const cover = candidates("bench", entry, p, 3);
+  const line = el("div", "cover-line");
+  line.append(el("b", null, "Bench cover"),
+    cover.length ? cover.map(({ p: c, pos }) => `${c.n} (${pos})`).join(", ") : "none eligible");
+  who.append(line);
+  row.append(photo, who);
+  return row;
+}
+
+function leagueBed({ league, rows }, i) {
+  const worst = Math.min(...rows.map((r) => SEVERITY[r.p.st]));
+  const board = el("article", "bed " + ST_CLASS[worst]);
+  board.style.setProperty("--i", Math.min(i, 8));
+  const paper = el("div", "paper");
+  const head = el("div", "chart-head");
+  const titles = el("div");
+  titles.append(el("div", "chart-title", "✚ League chart"), el("div", "chart-id", `${rows.length} patient${rows.length > 1 ? "s" : ""}`));
+  head.append(titles, leagueAvatar(league));
+  paper.append(head, el("h2", "name", league.name));
+  paper.lastChild.style.margin = "12px 0 2px";
+  rows.forEach((r) => paper.append(patientRow(r)));
+  paper.append(signature(doctorFor("league:" + league.league_id)));
+  board.append(paper);
+  return board;
+}
+
+function renderByLeague(shown) {
+  const groups = new Map();
+  for (const it of shown) {
+    for (const entry of it.entries) {
+      const g = groups.get(entry.league.league_id) || { league: entry.league, rows: [] };
+      g.rows.push({ pid: it.pid, p: it.p, entry });
+      groups.set(entry.league.league_id, g);
+    }
+  }
+  const arr = [...groups.values()];
+  for (const g of arr) g.rows.sort((a, b) => SEVERITY[a.p.st] - SEVERITY[b.p.st]);
+  const worst = (g) => Math.min(...g.rows.map((r) => SEVERITY[r.p.st]));
+  arr.sort((a, b) => worst(a) - worst(b) || b.rows.length - a.rows.length);
+  arr.forEach((g, i) => results.append(leagueBed(g, i)));
+}
+
+// ---------- rendering ----------
+function applyFilters() {
+  let hiddenStarted = 0, hiddenNotOut = 0;
+  const shown = [];
+  for (const it of last.list) {
+    if (hideBox.checked && last.games && hasStarted(it.p.team)) { hiddenStarted++; continue; }
+    if (onlyOutBox.checked && it.p.st !== "Out") { hiddenNotOut++; continue; }
+    shown.push(it);
+  }
+  return { shown, hiddenStarted, hiddenNotOut };
+}
+
+function ago(t) {
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+}
+
+function updateBar() {
+  bar.hidden = !last;
   if (!last) return;
-  const { leagueCount, started } = last;
+  const time = new Date(last.updated).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  updatedEl.replaceChildren(`Updated ${time}`, el("br"), `Injury report from ${ago(last.playersT)}`);
+}
+
+function render({ animate = false } = {}) {
+  if (!last) return;
   results.replaceChildren();
+  results.classList.toggle("enter", animate);
   setStatus("");
-  const lc = `${leagueCount} league${leagueCount > 1 ? "s" : ""}`;
+  updateBar();
+  const lc = `${last.leagueCount} league${last.leagueCount > 1 ? "s" : ""}`;
+  const { shown, hiddenStarted, hiddenNotOut } = applyFilters();
 
-  const hiding = hideBox.checked && started;
-  const list = hiding ? last.list.filter(({ p }) => !started.has(p.team)) : last.list;
-  const hidden = last.list.length - list.length;
-  const note = hidden ? `${hidden} hidden: game already started` :
-    hideBox.checked && !started ? "Couldn't load game times, so showing everyone" : "";
-
-  if (!list.length) {
+  if (!shown.length) {
     const box = el("div", "clear");
-    box.append(ecg(false, true), el("div", "big", hidden ? "Nothing left to treat" : "Clean bill of health"),
-      el("div", "meta", hidden
-        ? `Every injured starter across ${lc} has already kicked off (${hidden} hidden).`
+    const total = last.list.length;
+    const why = [hiddenStarted && "game already started", hiddenNotOut && "not OUT"].filter(Boolean).join(" or ");
+    box.append(ecg("steady", true), el("div", "big", total ? "Nothing left to treat" : "Clean bill of health"),
+      el("div", "meta", total
+        ? `${total} injured starter${total > 1 ? "s are" : " is"} hidden by your filters (${why}).`
         : `No injured starters across ${lc}. The treatment beds are empty.`));
     results.append(box);
     return;
   }
 
-  list.sort((a, b) => SEVERITY[a.p.st] - SEVERITY[b.p.st] || b.entries.length - a.entries.length);
+  shown.sort((a, b) => SEVERITY[a.p.st] - SEVERITY[b.p.st] || b.entries.length - a.entries.length);
 
   const clip = el("div", "clip");
-  clip.append(el("h2", null, `${list.length} patient${list.length > 1 ? "s" : ""} in the physio room`));
+  clip.append(el("h2", null, `${shown.length} patient${shown.length > 1 ? "s" : ""} in the physio room`));
   const tally = el("div", "tally");
   const counts = {};
-  for (const { p } of list) counts[p.st] = (counts[p.st] || 0) + 1;
+  for (const { p } of shown) counts[p.st] = (counts[p.st] || 0) + 1;
   for (const st of Object.keys(counts).sort((a, b) => SEVERITY[a] - SEVERITY[b])) {
     const pill = statusPill(st, "tally-pill");
     pill.append(` ${counts[st]}`);
@@ -531,28 +881,124 @@ function render() {
   }
   tally.append(el("span", "meta", `across ${lc}`));
   clip.append(tally);
-  if (note) clip.append(el("div", "meta", note));
+  const notes = [
+    hiddenStarted && `${hiddenStarted} hidden: game already started`,
+    hiddenNotOut && `${hiddenNotOut} hidden: not OUT`,
+    !last.games && "Couldn't load game times, so showing everyone",
+  ].filter(Boolean);
+  if (notes.length) clip.append(el("div", "meta", notes.join(" · ")));
   results.append(clip);
 
-  const doctors = shuffled(DOCTORS);
-  list.forEach(({ pid, p, entries }, i) => results.append(bed(pid, p, entries, doctors[i % doctors.length])));
+  if (byLeagueBox.checked) renderByLeague(shown);
+  else shown.forEach(({ pid, p, entries }, i) => results.append(bed(pid, p, entries, i)));
+
+  if (animate) playIntro(shown);
 }
 
-hideBox.addEventListener("change", () => {
-  try { localStorage.setItem("fd_hide_started", hideBox.checked ? "1" : "0"); } catch {}
-  render();
+// ---------- sound ----------
+let actx = null;
+function audio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+  } catch { actx = null; }
+  return actx;
+}
+
+function tone(t, freq, dur, vol) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = "sine"; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.setValueAtTime(vol, t + dur * 0.8);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+function monitorSound(sev, t) {
+  if (sev <= 1) tone(t, 1000, 0.9, 0.05);                       // flatline
+  else if (sev === 2) [0, 0.11, 0.22].forEach((d) => tone(t + d, 880, 0.07, 0.07)); // racing
+  else [0, 0.17].forEach((d) => tone(t + d, 880, 0.08, 0.07));  // lub-dub
+}
+
+function playIntro(shown) {
+  if (!soundOn || !audio() || actx.state !== "running") return;
+  const t0 = actx.currentTime + 0.3;
+  shown.slice(0, 3).forEach((it, i) => monitorSound(SEVERITY[it.p.st], t0 + i * 0.6));
+}
+
+function syncSound() {
+  soundBtn.textContent = soundOn ? "🔊" : "🔇";
+  soundBtn.setAttribute("aria-pressed", String(soundOn));
+  soundBtn.title = "Heartbeat sound: " + (soundOn ? "on" : "off");
+}
+soundBtn.addEventListener("click", () => {
+  soundOn = !soundOn;
+  store("fd_sound", soundOn ? "1" : "0");
+  syncSound();
+  if (soundOn && audio()) monitorSound(3, actx.currentTime + 0.05); // a sample blip
+});
+syncSound();
+
+// ---------- controls ----------
+for (const [box, key] of [[hideBox, "fd_hide_started"], [onlyOutBox, "fd_only_out"], [byLeagueBox, "fd_by_league"]]) {
+  box.addEventListener("change", () => { store(key, box.checked ? "1" : "0"); render(); });
+}
+
+async function refresh() {
+  if (busy || !last) return;
+  busy = true;
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = "Refreshing…";
+  try { await run(last.username, { quiet: true }); }
+  catch { setStatus("Couldn't refresh. Showing your last check.", true); }
+  finally { busy = false; refreshBtn.disabled = false; refreshBtn.textContent = "↻ Refresh"; }
+}
+refreshBtn.addEventListener("click", refresh);
+
+copyBtn.addEventListener("click", async () => {
+  if (!last) return;
+  const url = `${location.origin}${location.pathname}?u=${encodeURIComponent(last.username)}`;
+  try { await navigator.clipboard.writeText(url); copyBtn.textContent = "Copied!"; }
+  catch { copyBtn.textContent = "Copy failed"; }
+  setTimeout(() => { copyBtn.textContent = "🔗 Copy link"; }, 1600);
+});
+
+// game-day freshness: refresh every few minutes while the page is on screen
+setInterval(() => { if (document.visibilityState === "visible") refresh(); }, REFRESH_MS);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && last && Date.now() - last.updated > 2 * 60 * 1000) refresh();
 });
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const username = input.value.trim();
-  if (!username) return;
-  try { localStorage.setItem("fd_username", username); } catch {}
+  if (!username || busy) return;
+  store("fd_username", username);
+  if (soundOn) audio(); // unlock audio inside the tap
+  busy = true;
   go.disabled = true;
-  try { await run(username); }
-  catch (err) { results.replaceChildren(); setStatus(err.message || "Something went wrong.", true); }
-  finally { go.disabled = false; }
+  try {
+    await run(username);
+    try { history.replaceState(null, "", `?u=${encodeURIComponent(username)}`); } catch {}
+  } catch (err) {
+    last = null;
+    bar.hidden = true;
+    results.replaceChildren();
+    setStatus(err.message || "Something went wrong.", true);
+  } finally { busy = false; go.disabled = false; }
 });
+
+// open straight to results for a shared link (?u=name) or a returning user
+{
+  const start = new URLSearchParams(location.search).get("u") || load("fd_username");
+  if (start) { input.value = start; form.requestSubmit(); }
+}
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>
