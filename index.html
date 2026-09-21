@@ -49,13 +49,27 @@
 
   /* ---------- check-in form ---------- */
   .checkin { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
-  .checkin label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .checkin > label[for] { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
   .checkin .fields { display: flex; gap: 8px; }
-  input {
+  #username {
     flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; color: var(--text);
     background: var(--room); border: 1px solid var(--border); border-radius: 10px;
   }
-  input:focus-visible, button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+  #username:focus-visible, button:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+  /* game-started toggle */
+  .toggle { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--border); cursor: pointer; font-size: .92rem; }
+  .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .switch { flex: none; position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--frame); transition: background .15s; }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .15s;
+  }
+  .toggle input:checked + .switch { background: var(--teal); }
+  .toggle input:checked + .switch::after { transform: translateX(18px); }
+  .toggle input:focus-visible + .switch { outline: 3px solid var(--teal); outline-offset: 2px; }
+  .toggle small { display: block; color: var(--muted); font-size: .78rem; }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
   button {
     padding: 12px 18px; font-size: 16px; font-weight: 700; color: #fff; background: var(--teal);
     border: 0; border-bottom: 3px solid var(--teal-dark); border-radius: 10px; cursor: pointer;
@@ -80,7 +94,9 @@
     background: var(--frame); border-radius: 6px 6px 3px 3px;
   }
   .clip h2 { margin: 0 0 8px; font-size: 1.05rem; }
-  .tally { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tally { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .meta { color: var(--muted); font-size: .88rem; }
+  .clip > .meta { margin-top: 8px; }
 
   /* ---------- pills ---------- */
   .pill {
@@ -199,6 +215,11 @@
              autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <button id="go" type="submit">Check in</button>
     </div>
+    <label class="toggle">
+      <input type="checkbox" id="hideStarted" checked>
+      <span class="switch" aria-hidden="true"></span>
+      <span>Hide games that have started<small>Those lineups are most likely locked</small></span>
+    </label>
   </form>
 
   <div id="status" class="status" role="status"></div>
@@ -209,6 +230,8 @@
 
 <script>
 const API = "https://api.sleeper.app/v1";
+const ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
+const TEAM_FIX = { WSH: "WAS" }; // ESPN -> Sleeper team abbreviations
 const CDN = "https://sleepercdn.com";
 const PLAYERS_KEY = "fd_players_v2";
 const PLAYERS_TTL = 6 * 60 * 60 * 1000; // Sleeper asks apps not to refetch this often
@@ -220,7 +243,10 @@ const POS_CLASS = { QB: "QB", RB: "RB", WR: "WR", TE: "TE", K: "K", DEF: "DEF" }
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), input = $("username"), go = $("go"), statusEl = $("status"), results = $("results");
+const hideBox = $("hideStarted");
+let last = null; // latest fetched data, so the toggle can re-render without refetching
 try { input.value = localStorage.getItem("fd_username") || ""; } catch {}
+try { hideBox.checked = localStorage.getItem("fd_hide_started") !== "0"; } catch {}
 
 async function getJSON(path) {
   const res = await fetch(API + path);
@@ -276,6 +302,25 @@ function ecg(flat, live) {
 }
 
 // ---------- data ----------
+// Teams whose game this week has kicked off (or finished). null = couldn't find out.
+async function getStartedTeams(week, seasonType) {
+  try {
+    const type = { pre: 1, regular: 2, post: 3 }[seasonType] || 2;
+    const res = await fetch(`${ESPN}/scoreboard?week=${week}&seasontype=${type}`);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const started = new Set(), now = Date.now();
+    for (const ev of data.events || []) {
+      const kickedOff = ev.status.type.state !== "pre" || new Date(ev.date).getTime() <= now;
+      if (!kickedOff) continue;
+      for (const c of ev.competitions[0].competitors) {
+        started.add(TEAM_FIX[c.team.abbreviation] || c.team.abbreviation);
+      }
+    }
+    return started;
+  } catch { return null; }
+}
+
 async function run(username) {
   results.replaceChildren();
   showScan("Checking you in…");
@@ -283,7 +328,7 @@ async function run(username) {
   if (!user || !user.user_id) throw new Error(`No Sleeper user named "${username}".`);
 
   showScan("Finding your leagues…");
-  const { season } = await getJSON("/state/nfl");
+  const { season, week, season_type } = await getJSON("/state/nfl");
   const leagues = (await getJSON(`/user/${user.user_id}/leagues/nfl/${season}`))
     .filter((l) => !(l.settings && l.settings.best_ball === 1));
   if (!leagues.length) {
@@ -293,8 +338,9 @@ async function run(username) {
   }
 
   showScan(`Examining ${leagues.length} league${leagues.length > 1 ? "s" : ""}…`);
-  const [players, rosters] = await Promise.all([
+  const [players, started, rosters] = await Promise.all([
     getPlayers(),
+    getStartedTeams(week, season_type),
     Promise.all(leagues.map((l) => getJSON(`/league/${l.league_id}/rosters`).catch(() => []))),
   ]);
 
@@ -314,7 +360,8 @@ async function run(username) {
     });
   });
 
-  render([...flagged.values()], leagues.length);
+  last = { list: [...flagged.values()], leagueCount: leagues.length, started };
+  render();
 }
 
 function showScan(msg) {
@@ -447,16 +494,25 @@ function bed(pid, p, entries, doctor) {
   return board;
 }
 
-function render(list, leagueCount) {
+function render() {
+  if (!last) return;
+  const { leagueCount, started } = last;
   results.replaceChildren();
   setStatus("");
   const lc = `${leagueCount} league${leagueCount > 1 ? "s" : ""}`;
 
+  const hiding = hideBox.checked && started;
+  const list = hiding ? last.list.filter(({ p }) => !started.has(p.team)) : last.list;
+  const hidden = last.list.length - list.length;
+  const note = hidden ? `${hidden} hidden: game already started` :
+    hideBox.checked && !started ? "Couldn't load game times, so showing everyone" : "";
+
   if (!list.length) {
     const box = el("div", "clear");
-    const svg = ecg(false, true);
-    box.append(svg, el("div", "big", "Clean bill of health"),
-      el("div", "meta", `No injured starters across ${lc}. The treatment beds are empty.`));
+    box.append(ecg(false, true), el("div", "big", hidden ? "Nothing left to treat" : "Clean bill of health"),
+      el("div", "meta", hidden
+        ? `Every injured starter across ${lc} has already kicked off (${hidden} hidden).`
+        : `No injured starters across ${lc}. The treatment beds are empty.`));
     results.append(box);
     return;
   }
@@ -475,11 +531,17 @@ function render(list, leagueCount) {
   }
   tally.append(el("span", "meta", `across ${lc}`));
   clip.append(tally);
+  if (note) clip.append(el("div", "meta", note));
   results.append(clip);
 
   const doctors = shuffled(DOCTORS);
   list.forEach(({ pid, p, entries }, i) => results.append(bed(pid, p, entries, doctors[i % doctors.length])));
 }
+
+hideBox.addEventListener("change", () => {
+  try { localStorage.setItem("fd_hide_started", hideBox.checked ? "1" : "0"); } catch {}
+  render();
+});
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
