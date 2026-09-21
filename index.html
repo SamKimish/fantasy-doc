@@ -17,7 +17,8 @@
     --room: #e7f3f2; --tile: #d3e6e4; --card: #ffffff; --sheet: #eaf5f8; --sheet-line: #cfe4ea;
     --text: #12262a; --muted: #5b7378; --border: #cfe0e0; --shadow: 0 6px 18px rgba(14, 90, 90, .12);
     --teal: #0e7c7b; --teal-dark: #0a5c5b; --frame: #93a9ad;
-    --board: #b08b5e; --board-dark: #8a6a43; --paper: #fffef8; --paper-rule: #e3c9c9;
+    --board: #b08b5e; --board-dark: #8a6a43; --paper: #fffef8; --paper-2: #f1ecdc; --paper-rule: #e3c9c9;
+    --pg-0: #fffef8; --pg-1: #e6f2fb; --pg-2: #e9f6e6;
     --out: #d7263d; --ir: #7a3fd1; --doubtful: #dd5a0a; --questionable: #b98300;
     --qb: #d93f4f; --rb: #17915f; --wr: #2b73d6; --te: #c2650a; --k: #7c4ddb; --def: #6b5d52; --other: #5f6f74;
   }
@@ -26,7 +27,8 @@
       --room: #0c1a1c; --tile: #12282a; --card: #152426; --sheet: #1b3236; --sheet-line: #274449;
       --text: #e6f1f1; --muted: #93aeb1; --border: #26403f; --shadow: 0 6px 18px rgba(0, 0, 0, .4);
       --teal: #2bb5b3; --teal-dark: #1e8f8d; --frame: #5c7a7e;
-      --board: #6b533a; --board-dark: #4d3b2a; --paper: #1b2c2f; --paper-rule: #3a2f34;
+      --board: #6b533a; --board-dark: #4d3b2a; --paper: #1b2c2f; --paper-2: #15242a; --paper-rule: #3a2f34;
+      --pg-0: #1b2c2f; --pg-1: #1a2f3d; --pg-2: #1c3327;
       --out: #ff5a6e; --ir: #a985ff; --doubtful: #ff8a3d; --questionable: #f0b429;
     }
   }
@@ -138,7 +140,7 @@
 
   /* ---------- patient clipboard ---------- */
   .bed {
-    position: relative; margin: 26px 0 30px; padding: 14px 12px 14px; background: var(--board);
+    position: relative; isolation: isolate; margin: 26px 0 30px; padding: 14px 12px 22px; background: var(--board);
     border-radius: 14px; border-bottom: 5px solid var(--board-dark); box-shadow: var(--shadow);
   }
   .bed::before { /* metal clip */
@@ -154,6 +156,12 @@
     position: relative; padding: 30px 16px 14px; background: var(--paper); border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .25); border-left: 4px double var(--paper-rule);
   }
+  .paper::before, .paper::after { /* the other sheets, peeking out from behind */
+    content: ""; position: absolute; z-index: -1; inset: 0; background: var(--paper-2); border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+  .paper::before { transform: translate(-4px, 7px) rotate(-.7deg); }
+  .paper::after { transform: translate(4px, 13px) rotate(.6deg); background: var(--paper-rule); }
   .chart-head {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
     padding-bottom: 8px; border-bottom: 2px solid var(--text); margin-bottom: 4px;
@@ -161,19 +169,28 @@
   .chart-title { font-weight: 800; font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; }
   .chart-id { font: 600 .72rem ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
 
-  /* pages: swipe or tap the tabs */
-  .tabs { display: flex; margin-bottom: 2px; }
+  /* pages: separate coloured sheets with index tabs; swipe or tap a tab */
+  .pg-0 { --pg: var(--pg-0); } .pg-1 { --pg: var(--pg-1); } .pg-2 { --pg: var(--pg-2); }
+  .tabs { display: flex; gap: 4px; margin: 12px 6px 0; align-items: flex-end; position: relative; z-index: 1; }
   .tab {
-    flex: 1; padding: 8px 4px 7px; font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
-    color: var(--muted); background: none; border: 0; border-bottom: 3px solid var(--paper-rule); cursor: pointer;
+    flex: 1; position: relative; top: 3px; margin-bottom: -1px; padding: 7px 4px 6px;
+    font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+    color: var(--muted); background: var(--pg); border: 1px solid var(--paper-rule); border-bottom: 0;
+    border-radius: 9px 9px 0 0; cursor: pointer; filter: brightness(.94);
   }
-  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--st, var(--teal)); }
+  .tab[aria-selected="true"] {
+    top: 0; z-index: 2; padding-top: 9px; padding-bottom: 8px; color: var(--text); filter: none;
+    border-top: 3px solid var(--st, var(--teal));
+  }
   .scroller {
     display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none;
-    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; transition: height .2s ease;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; transition: height .2s ease; padding-bottom: 4px;
   }
   .scroller::-webkit-scrollbar { display: none; }
-  .panel { flex: 0 0 100%; min-width: 0; align-self: flex-start; scroll-snap-align: start; padding: 12px 4px 2px; }
+  .panel {
+    flex: 0 0 100%; min-width: 0; align-self: flex-start; scroll-snap-align: start; padding: 16px 12px 12px;
+    background: var(--pg); border: 1px solid var(--paper-rule); border-radius: 4px; box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+  }
 
   .patient { display: flex; gap: 12px; align-items: flex-start; }
   .photo { /* ID photo, taped on */
@@ -618,8 +635,8 @@ function pager(key, pages) {
   const tabs = el("div", "tabs");
   tabs.setAttribute("role", "tablist");
   const scroller = el("div", "scroller");
-  const panels = pages.map((pg) => {
-    const panel = el("div", "panel");
+  const panels = pages.map((pg, i) => {
+    const panel = el("div", "panel pg-" + i);
     panel.setAttribute("role", "tabpanel");
     panel.append(pg.node);
     return panel;
@@ -628,7 +645,7 @@ function pager(key, pages) {
   let active = 0;
 
   const btns = pages.map((pg, i) => {
-    const b = el("button", "tab", pg.label);
+    const b = el("button", "tab pg-" + i, pg.label);
     b.type = "button";
     b.setAttribute("role", "tab");
     b.addEventListener("click", () => scroller.scrollTo({ left: i * scroller.clientWidth, behavior: reduce ? "auto" : "smooth" }));
@@ -638,7 +655,8 @@ function pager(key, pages) {
     active = i;
     pageState.set(key, i);
     btns.forEach((b, j) => b.setAttribute("aria-selected", String(j === i)));
-    scroller.style.height = panels[i].offsetHeight + "px";
+    const cs = getComputedStyle(scroller);
+    scroller.style.height = panels[i].offsetHeight + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + "px";
   };
 
   let raf = 0;
