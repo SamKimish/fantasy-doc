@@ -376,7 +376,25 @@ function field(label, value) {
   return f;
 }
 
-function bed(pid, p, entries) {
+const DOCTORS = [
+  "Dr. Pat Ellar", "Dr. Achilles Heel", "Dr. Tommy John Madden", "Dr. Matthew Staph-ford",
+  "Dr. Justin Herbal-Remedy", "Dr. Nick Foles-Acid", "Dr. Sack Roiliac", "Dr. Fourth-and-Ibuprofen",
+  "Dr. Two-Minute Warning Label", "Dr. Bill Belichec-Up", "Dr. Tight End-oscopy", "Dr. Hail Mary Poppins",
+  "Dr. Dak Prescription", "Dr. Derrick Hernia", "Dr. Josh Allen Wrench", "Dr. Cam Newton-Meter",
+  "Dr. Deflate-Gate-orade", "Dr. Fumble Fingers", "Dr. Wide Receiver-Rx", "Dr. Patrick Mahomeopathy",
+];
+
+// Fisher-Yates shuffle, so every check-in gets a fresh, non-repeating set of physicians
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function bed(pid, p, entries, doctor) {
   const sev = SEVERITY[p.st];
   const flat = sev <= 1; // Out / IR: flatline
   const board = el("article", "bed " + ST_CLASS[sev]);
@@ -422,7 +440,7 @@ function bed(pid, p, entries) {
   }
 
   const sign = el("div", "sign", "Attending physician:");
-  sign.append(el("em", null, "Dr. Fantasy"));
+  sign.append(el("em", null, doctor));
 
   paper.append(head, patient, mon, fields, ul, sign);
   board.append(paper);
@@ -459,7 +477,8 @@ function render(list, leagueCount) {
   clip.append(tally);
   results.append(clip);
 
-  for (const { pid, p, entries } of list) results.append(bed(pid, p, entries));
+  const doctors = shuffled(DOCTORS);
+  list.forEach(({ pid, p, entries }, i) => results.append(bed(pid, p, entries, doctors[i % doctors.length])));
 }
 
 form.addEventListener("submit", async (e) => {
