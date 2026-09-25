@@ -236,7 +236,7 @@
 
   .fields { display: grid; gap: 8px; }
   .field { display: flex; align-items: baseline; gap: 10px; border-bottom: 1px dotted var(--muted); padding-bottom: 3px; }
-  .flabel { flex: none; width: 58px; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .flabel { flex: none; width: 64px; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .fvalue { flex: 1; min-width: 0; font-size: .95rem; font-weight: 600; }
 
   .leagues { margin: 14px 0 0; padding: 0; list-style: none; }
@@ -250,6 +250,31 @@
   .leagues .lname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sign { margin-top: 12px; padding-top: 6px; border-top: 1px solid var(--paper-rule); font-size: .7rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
   .sign em { font: italic 1.05rem Georgia, "Times New Roman", serif; color: var(--text); text-transform: none; letter-spacing: 0; margin-left: 6px; }
+
+  /* practice report: one dot per day */
+  .trail { display: flex; gap: 12px; flex-wrap: wrap; }
+  .day { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .dot {
+    width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    font-size: .75rem; font-weight: 900; line-height: 1; color: #fff; background: var(--lv, transparent);
+  }
+  .lv-green { --lv: #17915f; } .lv-yellow { --lv: #f0b429; color: #3a2a00; } .lv-red { --lv: var(--out); }
+  .lv-none { border: 2px dashed var(--muted); color: var(--muted); background: none; }
+  .legend { margin-top: 5px; font-size: .7rem; font-weight: 400; color: var(--muted); }
+  .trail.compact { display: inline-flex; vertical-align: middle; gap: 8px; }
+  .trail.compact .dot { width: 18px; height: 18px; font-size: .65rem; }
+
+  /* latest news from ESPN */
+  .news { margin-top: 14px; padding: 10px 12px; background: var(--sheet); border-left: 3px solid var(--st, var(--teal)); border-radius: 0 8px 8px 0; }
+  .news h3 { margin: 0 0 4px; font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  .news p { margin: 0; }
+  .news .short { font-size: .93rem; }
+  .news .nomsg { font-size: .88rem; color: var(--muted); }
+  .news .nmeta { margin-top: 4px; font-size: .75rem; color: var(--muted); }
+  .news details { margin-top: 6px; }
+  .news summary { cursor: pointer; font-size: .8rem; font-weight: 700; color: var(--teal); }
+  .news .long { margin-top: 6px; font-size: .86rem; }
+  .news .nlink { display: inline-block; margin-top: 6px; font-size: .8rem; font-weight: 700; color: var(--teal); }
 
   /* bench cover / waiver pages */
   .cover-head { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; font-weight: 750; font-size: .95rem; }
@@ -345,11 +370,13 @@
   <footer>Best ball leagues are excluded &middot; Data from Sleeper and ESPN</footer>
 </main>
 
+<script src="practice.js"></script>
 <script>
 const API = "https://api.sleeper.app/v1";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 const TEAM_FIX = { WSH: "WAS" }; // ESPN -> Sleeper team abbreviations
 const CDN = "https://sleepercdn.com";
+const SNAPSHOT_URL = "https://raw.githubusercontent.com/SamKimish/fantasy-doc/data/practice.json";
 const PLAYERS_KEY = "fd_players_v3";
 const PLAYERS_TTL = 6 * 60 * 60 * 1000; // Sleeper asks apps not to refetch this often
 const REFRESH_MS = 5 * 60 * 1000;
@@ -366,6 +393,10 @@ const SLOT_POS = {
 };
 const SLOT_LABEL = { SUPER_FLEX: "SFLX", FLEX: "FLX", WRRB_FLEX: "W/R", REC_FLEX: "W/T", IDP_FLEX: "IDP" };
 const slotLabel = (s) => SLOT_LABEL[s] || s;
+// practice report: green = full, yellow = limited, red = did not practice (glyphs help colour-blind readers)
+const PRACTICE_DAYS = [["Wed", "Wednesday"], ["Thu", "Thursday"], ["Fri", "Friday"]];
+const LV = { green: ["\u2713", "full practice"], yellow: ["\u25D0", "limited"], red: ["\u2715", "did not practice"], none: ["\u2013", "not reported"] };
+const BARE_NEWS = /^(questionable|doubtful|out|inactive|active|ir|injured reserve)\.?$/i; // a status word, not a story
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), input = $("username"), go = $("go"), statusEl = $("status"), results = $("results");
@@ -431,6 +462,41 @@ async function getGames(week, seasonType) {
       }
     }
     return games.size ? games : null;
+  } catch { return null; }
+}
+
+// ESPN's injury feed: latest news blurb per player, plus the practice days we can read from it.
+// Keyed by name + team because Sleeper often has no ESPN id.
+async function getNews() {
+  try {
+    const res = await fetch(`${ESPN}/injuries`);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const news = new Map();
+    for (const team of data.injuries || []) {
+      for (const item of team.injuries || []) {
+        const a = item.athlete || {};
+        if (!a.displayName) continue;
+        const short = item.shortComment || "", long = item.longComment || "";
+        const card = (a.links || []).find((l) => (l.rel || []).includes("playercard"));
+        news.set(Practice.playerKey(a.displayName, a.team && a.team.abbreviation), {
+          short, long, date: item.date,
+          link: card && /^https:\/\/(www\.)?espn\.com\//.test(card.href) ? card.href : "",
+          trail: Practice.parseTrail(`${short} ${long}`),
+        });
+      }
+    }
+    return news;
+  } catch { return null; }
+}
+
+// Days seen earlier in the week, recorded every couple of hours by the snapshot job (see the `data` branch).
+async function getSnapshot(season, week) {
+  try {
+    const res = await fetch(SNAPSHOT_URL);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    return data.season === season && data.week === week ? data.players || {} : {};
   } catch { return null; }
 }
 
@@ -547,9 +613,11 @@ async function run(username, { quiet = false } = {}) {
   }
 
   if (!quiet) showScan(`Examining ${leagues.length} league${leagues.length > 1 ? "s" : ""}…`);
-  const [pl, games, rosters] = await Promise.all([
+  const [pl, games, news, snapshot, rosters] = await Promise.all([
     getPlayers(),
     getGames(week, season_type),
+    getNews(),
+    getSnapshot(season, week),
     Promise.all(leagues.map((l) => getJSON(`/league/${l.league_id}/rosters`).catch(() => []))),
   ]);
   const players = pl.p;
@@ -573,7 +641,7 @@ async function run(username, { quiet = false } = {}) {
   });
 
   if (!quiet) { docMap.clear(); doctorOrder = shuffled(DOCTORS); pageState.clear(); }
-  last = { username, list: [...flagged.values()], leagueCount: leagues.length, games, players, playersT: pl.t, info, updated: Date.now() };
+  last = { username, list: [...flagged.values()], leagueCount: leagues.length, games, news, snapshot, players, playersT: pl.t, info, updated: Date.now() };
   render({ animate: !quiet });
 }
 
@@ -640,8 +708,71 @@ function shortDate(iso) {
 
 function field(label, value) {
   const f = el("div", "field");
-  f.append(el("span", "flabel", label), el("span", "fvalue", value));
+  const v = el("span", "fvalue");
+  if (typeof value === "string") v.textContent = value;
+  else v.append(value);
+  f.append(el("span", "flabel", label), v);
   return f;
+}
+
+// ---------- practice report + news ----------
+function trailFor(p) {
+  const key = Practice.playerKey(p.n, p.team);
+  const earlier = (last.snapshot && last.snapshot[key]) || {};
+  const item = last.news && last.news.get(key);
+  return { ...earlier, ...(item ? item.trail : {}) }; // today's wording beats the recorded snapshot
+}
+
+function practiceChips(p, compact) {
+  const trail = trailFor(p);
+  const wrap = el("div", "trail" + (compact ? " compact" : ""));
+  for (const [short, full] of PRACTICE_DAYS) {
+    const level = trail[short] || "none";
+    const day = el("span", "day");
+    const dot = el("span", "dot lv-" + level, LV[level][0]);
+    dot.setAttribute("role", "img");
+    dot.setAttribute("aria-label", `${full}: ${LV[level][1]}`);
+    dot.title = `${full}: ${LV[level][1]}`;
+    day.append(dot, short);
+    wrap.append(day);
+  }
+  return wrap;
+}
+
+function practiceField(p) {
+  const box = el("div");
+  box.append(practiceChips(p));
+  const anyDay = Object.keys(trailFor(p)).length > 0;
+  box.append(el("div", "legend",
+    !last.news && !last.snapshot ? "Practice reports unavailable right now"
+      : anyDay ? "\u2713 full \u00B7 \u25D0 limited \u00B7 \u2715 did not practice \u00B7 dashed = not reported"
+      : "No practice report found yet"));
+  return field("Practice", box);
+}
+
+function newsBlock(p) {
+  const box = el("div", "news");
+  box.append(el("h3", null, "Latest news"));
+  const item = last.news && last.news.get(Practice.playerKey(p.n, p.team));
+  if (!last.news) { box.append(el("p", "nomsg", "News unavailable right now.")); return box; }
+  if (!item || !item.short || BARE_NEWS.test(item.short.trim())) {
+    box.append(el("p", "nomsg", "No beat-reporter notes from ESPN yet."));
+    return box;
+  }
+  box.append(el("p", "short", item.short));
+  const when = item.date ? new Date(item.date).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+  box.append(el("div", "nmeta", [when && `Updated ${when}`, "via ESPN"].filter(Boolean).join(" \u00B7 ")));
+  if (item.long && item.long !== item.short) {
+    const more = el("details");
+    more.append(el("summary", null, "More detail"), el("p", "long", item.long));
+    box.append(more);
+  }
+  if (item.link) {
+    const a = el("a", "nlink", "Player card on ESPN \u203A");
+    a.href = item.link; a.target = "_blank"; a.rel = "noopener";
+    box.append(a);
+  }
+  return box;
 }
 
 const DOCTORS = [
@@ -787,6 +918,7 @@ function chartPage(pid, p, entries) {
 
   const fields = el("div", "fields");
   fields.append(field("Injury", p.body || "Not specified"));
+  fields.append(practiceField(p));
   const game = gameLabel(p.team);
   if (game) fields.append(field("Game", game));
   if (p.notes) fields.append(field("Notes", p.notes));
@@ -800,7 +932,7 @@ function chartPage(pid, p, entries) {
     if (slot) li.append(el("span", "pill slot", slotLabel(slot)));
     ul.append(li);
   }
-  page.append(patient, mon, fields, ul);
+  page.append(patient, mon, fields, newsBlock(p), ul);
   return page;
 }
 
@@ -839,6 +971,9 @@ function patientRow({ pid, p, entry }) {
   tags.append(posPill(p.pos), teamPill(p.team), el("span", "pill slot", slotLabel(entry.slot || p.pos)), statusPill(p.st));
   who.append(el("div", "pname", p.n), tags,
     el("div", "vitals", [p.body || "Injury not specified", gameLabel(p.team)].filter(Boolean).join(" · ")));
+  const practice = el("div", "cover-line");
+  practice.append(el("b", null, "Practice"), practiceChips(p, true));
+  who.append(practice);
   const cover = candidates("bench", entry, p, 3);
   const line = el("div", "cover-line");
   line.append(el("b", null, "Bench cover"),

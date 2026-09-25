@@ -1,7 +1,7 @@
 // Network-first service worker: always tries the live site, falls back to the cache offline.
 // Only same-origin files are handled; Sleeper/ESPN API calls are never cached.
-const CACHE = "fantasy-doc-v1";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png"];
+const CACHE = "fantasy-doc-v2";
+const SHELL = ["./", "index.html", "practice.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
