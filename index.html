@@ -305,7 +305,9 @@
   .clear svg { width: 120px; height: 34px; margin-bottom: 6px; }
   .clear .ecg { stroke: var(--rb); }
 
-  footer { color: var(--muted); font-size: .8rem; margin-top: 8px; text-align: center; }
+  .sign .by { margin-top: 4px; font-size: .72rem; letter-spacing: 0; text-transform: none; }
+  .suggest { color: var(--teal); font-weight: 700; }
+  footer { color: var(--muted); font-size: .8rem; margin-top: 8px; text-align: center; line-height: 1.6; }
 
   /* ---------- motion ---------- */
   @keyframes sweep { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
@@ -367,7 +369,10 @@
   <div id="status" class="status" role="status"></div>
   <div id="results"></div>
 
-  <footer>Best ball leagues are excluded &middot; Data from Sleeper and ESPN</footer>
+  <footer>
+    Best ball leagues are excluded &middot; Data from Sleeper and ESPN<br>
+    Got a doctor pun? <a id="suggestFooter" class="suggest" target="_blank" rel="noopener">Suggest your own</a>
+  </footer>
 </main>
 
 <script src="practice.js"></script>
@@ -775,13 +780,36 @@ function newsBlock(p) {
   return box;
 }
 
-const DOCTORS = [
+const HOUSE_DOCTORS = [
   "Dr. Pat Ellar", "Dr. Achilles Heel", "Dr. Tommy John Madden", "Dr. Matthew Staph-ford",
   "Dr. Justin Herbal-Remedy", "Dr. Nick Foles-Acid", "Dr. Sack Roiliac", "Dr. Fourth-and-Ibuprofen",
   "Dr. Two-Minute Warning Label", "Dr. Bill Belicheck-Up", "Dr. Tight End-oscopy", "Dr. Hail Mary Poppins",
   "Dr. Dak Prescription", "Dr. Derrick Hernia", "Dr. Josh Allen Wrench", "Dr. Cam Newton-Meter",
   "Dr. Deflate-Gate-orade", "Dr. Fumble Fingers", "Dr. Wide Receiver-Rx", "Dr. Patrick Mahomeopathy",
 ];
+
+// Puns from the beta testers, credited on the chart. To add one: put the name under the suggester's first name.
+const SUGGESTED = {
+  Seb: ["Piles Garrett"],
+  Scotty: ["Aaron Bones", "Zaire LisFranklin", "Ryan Fitzmagic Sponge", "Sam Lifesupporta"],
+  Innes: ["Cystian McCafferty", "Tumour Tagovailoa", "DVT Metcalf", "TJ Wart"],
+  Paddy: ["Aidan Crutchinson", "Stentson Bennett"],
+  Nick: ["Adrian Paediatrician"],
+};
+const DOCTORS = [
+  ...HOUSE_DOCTORS.map((name) => ({ name })),
+  ...Object.entries(SUGGESTED).flatMap(([by, names]) => names.map((n) => ({ name: "Dr. " + n, by }))),
+];
+
+// "Suggest your own" opens a pre-filled GitHub issue (no account details or email exposed on the page)
+const SUGGEST_URL = "https://github.com/SamKimish/fantasy-doc/issues/new?title=" + encodeURIComponent("Doctor pun suggestion") +
+  "&body=" + encodeURIComponent("Doctor name (an NFL player + a medical pun):\n\nYour first name (for the credit):\n");
+$("suggestFooter").href = SUGGEST_URL;
+function suggestLink(text) {
+  const a = el("a", "suggest", text);
+  a.href = SUGGEST_URL; a.target = "_blank"; a.rel = "noopener";
+  return a;
+}
 
 // Fisher-Yates shuffle, so every check-in gets a fresh, non-repeating set of physicians
 function shuffled(arr) {
@@ -936,9 +964,14 @@ function chartPage(pid, p, entries) {
   return page;
 }
 
-function signature(name) {
+function signature(doctor) {
   const sign = el("div", "sign", "Attending physician:");
-  sign.append(el("em", null, name));
+  sign.append(el("em", null, doctor.name));
+  if (doctor.by) {
+    const credit = el("div", "by", `Pun suggested by ${doctor.by} · `);
+    credit.append(suggestLink("Suggest your own"));
+    sign.append(credit);
+  }
   return sign;
 }
 
