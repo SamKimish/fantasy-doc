@@ -349,6 +349,7 @@
     <div class="toggles">
       <label class="toggle"><input type="checkbox" id="hideStarted" checked><span class="switch" aria-hidden="true"></span><span>Hide games that have started</span></label>
       <label class="toggle"><input type="checkbox" id="onlyOut"><span class="switch" aria-hidden="true"></span><span>Only show OUT players</span></label>
+      <label class="toggle"><input type="checkbox" id="hidePracticed"><span class="switch" aria-hidden="true"></span><span>Hide players who have practiced</span></label>
       <label class="toggle"><input type="checkbox" id="byLeague"><span class="switch" aria-hidden="true"></span><span>Group by league</span></label>
       <fieldset class="sort">
         <legend>Sort by</legend>
@@ -405,7 +406,7 @@ const BARE_NEWS = /^(questionable|doubtful|out|inactive|active|ir|injured reserv
 
 const $ = (id) => document.getElementById(id);
 const form = $("form"), input = $("username"), go = $("go"), statusEl = $("status"), results = $("results");
-const hideBox = $("hideStarted"), onlyOutBox = $("onlyOut"), byLeagueBox = $("byLeague");
+const hideBox = $("hideStarted"), onlyOutBox = $("onlyOut"), hidePracBox = $("hidePracticed"), byLeagueBox = $("byLeague");
 const bar = $("bar"), updatedEl = $("updated"), refreshBtn = $("refresh"), copyBtn = $("copy"), soundBtn = $("sound");
 
 let last = null;   // latest fetched data, so toggles can re-render without refetching
@@ -417,6 +418,7 @@ function load(key) { try { return localStorage.getItem(key); } catch { return nu
 
 hideBox.checked = load("fd_hide_started") !== "0";
 onlyOutBox.checked = load("fd_only_out") === "1";
+hidePracBox.checked = load("fd_hide_practiced") === "1";
 byLeagueBox.checked = load("fd_by_league") === "1";
 let soundOn = load("fd_sound") === "1";
 let sortMode = load("fd_sort") === "record" ? "record" : "severity"; // default: injury severity
@@ -1052,14 +1054,16 @@ function renderByLeague(shown) {
 
 // ---------- rendering ----------
 function applyFilters() {
-  let hiddenStarted = 0, hiddenNotOut = 0;
+  let hiddenStarted = 0, hiddenNotOut = 0, hiddenPracticed = 0;
   const shown = [];
   for (const it of last.list) {
     if (hideBox.checked && last.games && hasStarted(it.p.team)) { hiddenStarted++; continue; }
     if (onlyOutBox.checked && it.p.st !== "Out") { hiddenNotOut++; continue; }
+    // practiced = at least a limited session on any day we know about; no data at all stays visible
+    if (hidePracBox.checked && Object.values(trailFor(it.p)).some((lv) => lv === "green" || lv === "yellow")) { hiddenPracticed++; continue; }
     shown.push(it);
   }
-  return { shown, hiddenStarted, hiddenNotOut };
+  return { shown, hiddenStarted, hiddenNotOut, hiddenPracticed };
 }
 
 function ago(t) {
@@ -1081,12 +1085,12 @@ function render({ animate = false } = {}) {
   setStatus("");
   updateBar();
   const lc = `${last.leagueCount} league${last.leagueCount > 1 ? "s" : ""}`;
-  const { shown, hiddenStarted, hiddenNotOut } = applyFilters();
+  const { shown, hiddenStarted, hiddenNotOut, hiddenPracticed } = applyFilters();
 
   if (!shown.length) {
     const box = el("div", "clear");
     const total = last.list.length;
-    const why = [hiddenStarted && "game already started", hiddenNotOut && "not OUT"].filter(Boolean).join(" or ");
+    const why = [hiddenStarted && "game already started", hiddenNotOut && "not OUT", hiddenPracticed && "has practiced"].filter(Boolean).join(" or ");
     box.append(ecg("steady", true), el("div", "big", total ? "Nothing left to treat" : "Clean bill of health"),
       el("div", "meta", total
         ? `${total} injured starter${total > 1 ? "s are" : " is"} hidden by your filters (${why}).`
@@ -1112,6 +1116,7 @@ function render({ animate = false } = {}) {
   const notes = [
     hiddenStarted && `${hiddenStarted} hidden: game already started`,
     hiddenNotOut && `${hiddenNotOut} hidden: not OUT`,
+    hiddenPracticed && `${hiddenPracticed} hidden: has practiced`,
     !last.games && "Couldn't load game times, so showing everyone",
     sortMode === "record" && "Sorted by league record",
   ].filter(Boolean);
@@ -1171,7 +1176,7 @@ soundBtn.addEventListener("click", () => {
 syncSound();
 
 // ---------- controls ----------
-for (const [box, key] of [[hideBox, "fd_hide_started"], [onlyOutBox, "fd_only_out"], [byLeagueBox, "fd_by_league"]]) {
+for (const [box, key] of [[hideBox, "fd_hide_started"], [onlyOutBox, "fd_only_out"], [hidePracBox, "fd_hide_practiced"], [byLeagueBox, "fd_by_league"]]) {
   box.addEventListener("change", () => { store(key, box.checked ? "1" : "0"); render(); });
 }
 
