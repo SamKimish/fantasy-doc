@@ -77,20 +77,35 @@
   }
   #go:disabled { opacity: .6; cursor: default; }
 
-  .toggles { margin-top: 14px; padding-top: 4px; border-top: 1px dashed var(--border); }
-  .toggle { display: flex; align-items: center; gap: 10px; margin-top: 10px; cursor: pointer; font-size: .92rem; }
-  .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-  .switch { flex: none; position: relative; width: 44px; height: 26px; border-radius: 999px; background: var(--frame); transition: background .15s; }
-  .switch::after {
-    content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
-    background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .15s;
+  /* filters & view: one collapsible section, options as tap-to-toggle chips */
+  .options { margin-top: 12px; border-top: 1px dashed var(--border); }
+  .options summary {
+    display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; cursor: pointer; list-style: none;
+    font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em;
   }
-  .toggle input:checked + .switch { background: var(--teal); }
-  .toggle input:checked + .switch::after { transform: translateX(18px); }
-  .toggle input:focus-visible + .switch { outline: 3px solid var(--teal); outline-offset: 2px; }
+  .options summary::-webkit-details-marker { display: none; }
+  .options summary::after { content: "\25BE"; margin-left: auto; font-size: 1rem; transition: transform .15s; }
+  .options[open] summary::after { transform: rotate(180deg); }
+  .options summary:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
+  .count {
+    min-width: 20px; padding: 0 7px; border-radius: 999px; background: var(--teal); color: #fff;
+    font-size: .72rem; line-height: 20px; text-align: center; letter-spacing: 0;
+  }
+  .count[hidden] { display: none; }
+  .opt-label { margin: 10px 0 6px; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { cursor: pointer; }
+  .chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .chip span {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+    font-size: .85rem; font-weight: 700; color: var(--text); background: var(--room); border: 1px solid var(--border);
+  }
+  .chip input:checked + span { background: var(--teal); border-color: var(--teal); color: #fff; }
+  .chip input:checked + span::before { content: "\2713"; font-weight: 900; }
+  .chip input:focus-visible + span { outline: 3px solid var(--teal); outline-offset: 2px; }
 
-  .sort { margin: 14px 0 0; padding: 12px 0 0; border: 0; border-top: 1px dashed var(--border); }
-  .sort legend { float: left; margin: 0 10px 0 0; padding: 0; line-height: 34px; font-size: .92rem; }
+  .sort { margin: 10px 0 0; padding: 0; border: 0; }
+  .sort legend { float: left; margin: 0 10px 0 0; padding: 0; line-height: 34px; font-size: .85rem; font-weight: 700; }
   .seg { display: flex; background: var(--room); border: 1px solid var(--border); border-radius: 10px; padding: 2px; }
   .seg label { flex: 1; cursor: pointer; }
   .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -323,7 +338,7 @@
   @media (prefers-reduced-motion: reduce) {
     .ecg.live { animation: none; stroke-dasharray: none; }
     .enter .bed, .enter .stamp { animation: none; }
-    .scroller, .switch, .switch::after { transition: none; }
+    .scroller, .options summary::after { transition: none; }
   }
   @media (max-width: 380px) { .avatar { width: 58px; height: 58px; } .stamp { font-size: .75rem; } .cand .avatar { width: 40px; height: 40px; } .prow .avatar { width: 46px; height: 46px; } }
 </style>
@@ -346,11 +361,18 @@
              autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <button id="go" type="submit">Check in</button>
     </div>
-    <div class="toggles">
-      <label class="toggle"><input type="checkbox" id="hideStarted" checked><span class="switch" aria-hidden="true"></span><span>Hide games that have started</span></label>
-      <label class="toggle"><input type="checkbox" id="onlyOut"><span class="switch" aria-hidden="true"></span><span>Only show OUT players</span></label>
-      <label class="toggle"><input type="checkbox" id="hidePracticed"><span class="switch" aria-hidden="true"></span><span>Hide players who have practiced</span></label>
-      <label class="toggle"><input type="checkbox" id="byLeague"><span class="switch" aria-hidden="true"></span><span>Group by league</span></label>
+    <details id="options" class="options" open>
+      <summary>Filters &amp; view <span id="optCount" class="count" hidden></span></summary>
+      <div class="opt-label">Filter</div>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="hideStarted" checked><span>Hide started games</span></label>
+        <label class="chip"><input type="checkbox" id="onlyOut"><span>Only OUT</span></label>
+        <label class="chip"><input type="checkbox" id="hidePracticed"><span>Hide practiced</span></label>
+      </div>
+      <div class="opt-label">View</div>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="byLeague"><span>Group by league</span></label>
+      </div>
       <fieldset class="sort">
         <legend>Sort by</legend>
         <div class="seg">
@@ -358,7 +380,7 @@
           <label><input type="radio" name="sort" value="record"><span>League record</span></label>
         </div>
       </fieldset>
-    </div>
+    </details>
   </form>
 
   <div id="bar" class="bar" hidden>
@@ -423,6 +445,18 @@ byLeagueBox.checked = load("fd_by_league") === "1";
 let soundOn = load("fd_sound") === "1";
 let sortMode = load("fd_sort") === "record" ? "record" : "severity"; // default: injury severity
 document.querySelector(`input[name=sort][value=${sortMode}]`).checked = true;
+
+// "Filters & view" panel: remembers whether it's open, and shows how many options are switched on
+const optionsPanel = $("options"), optCount = $("optCount");
+optionsPanel.open = load("fd_options_open") !== "0";
+optionsPanel.addEventListener("toggle", () => store("fd_options_open", optionsPanel.open ? "1" : "0"));
+function updateOptionCount() {
+  const n = [hideBox, onlyOutBox, hidePracBox, byLeagueBox].filter((b) => b.checked).length + (sortMode === "record" ? 1 : 0);
+  optCount.textContent = n;
+  optCount.hidden = !n;
+  optCount.title = `${n} option${n === 1 ? "" : "s"} switched on`;
+}
+updateOptionCount();
 
 async function getJSON(path) {
   const res = await fetch(API + path);
@@ -1177,12 +1211,13 @@ syncSound();
 
 // ---------- controls ----------
 for (const [box, key] of [[hideBox, "fd_hide_started"], [onlyOutBox, "fd_only_out"], [hidePracBox, "fd_hide_practiced"], [byLeagueBox, "fd_by_league"]]) {
-  box.addEventListener("change", () => { store(key, box.checked ? "1" : "0"); render(); });
+  box.addEventListener("change", () => { store(key, box.checked ? "1" : "0"); updateOptionCount(); render(); });
 }
 
 document.querySelectorAll("input[name=sort]").forEach((r) => r.addEventListener("change", () => {
   sortMode = r.value;
   store("fd_sort", sortMode);
+  updateOptionCount();
   render();
 }));
 
